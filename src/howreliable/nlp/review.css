@@ -1,0 +1,16 @@
+:root { font-family: system-ui, sans-serif; color: #18232c; background: #edf1f4; }
+main { max-width: 1050px; margin: 1rem auto; padding: 0 1rem 3rem; }
+section { background: white; border: 1px solid #c3ccd2; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+label { display: block; margin: .65rem 0; }
+input:not([type=checkbox]), textarea, select { box-sizing: border-box; display: block; width: 100%; padding: .5rem; font: inherit; }
+input[type=checkbox] { margin-right: .5rem; }
+button { padding: .55rem .8rem; margin: .25rem; cursor: pointer; font: inherit; }
+button:disabled { cursor: default; }
+.toolbar { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+.toolbar select { flex: 1; min-width: 240px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .8rem; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 1.05rem/1.6 system-ui, sans-serif; padding: 1rem; border: 2px solid #667b8a; max-height: 28rem; overflow: auto; user-select: text; }
+pre::selection, pre *::selection { background: #ffe09b; }
+.entry { border-left: 4px solid #51728a; padding: .5rem; margin: .7rem 0; overflow-wrap: anywhere; }
+#message { font-weight: 600; min-height: 1.5rem; white-space: pre-wrap; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #136ea6; }

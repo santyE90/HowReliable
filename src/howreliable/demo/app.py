@@ -1,0 +1,133 @@
+"""Optional local demo factory, preserving the original frozen API factory."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from howreliable.api.app import create_app as create_prediction_app
+from howreliable.api.schemas import CohortSummary
+from howreliable.api.service import PredictionService
+from howreliable.config.settings import Settings
+from howreliable.data.ingestion.nhtsa_complaints import sha256_file
+from howreliable.demo.index import DEFAULT_INDEX, HistoricalIndex
+from howreliable.demo.schemas import (
+    ExploratorySummary,
+    HistoricalSummary,
+    HistoricalVehicle,
+    PredictionLink,
+    Resolution,
+    VehiclePage,
+)
+
+G1_SUMMARY = Path("artifacts/nlp/owner-reports/g1-smoke-20261027-seed-8a01/summary.json")
+
+
+def create_app(
+    *, root: Path | None = None, index_path: Path | None = None,
+    service: PredictionService | None = None,
+) -> FastAPI:
+    """Local backend only: never select the optional S3 artifact backend."""
+    root = root or Path.cwd()
+    index = HistoricalIndex(index_path or root / DEFAULT_INDEX)
+    app = create_prediction_app(
+        root=root, service=service, settings=Settings(artifact_backend="local"),
+    )
+    predictions: PredictionService = app.state.prediction_service
+    static = Path(__file__).with_name("static")
+    app.mount("/static", StaticFiles(directory=static), name="demo-static")
+
+    @app.get("/", include_in_schema=False)
+    def home() -> FileResponse:
+        return FileResponse(static / "index.html", headers={
+            "Content-Security-Policy": (
+                "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                "connect-src 'self'; img-src 'self'; object-src 'none'; "
+                "base-uri 'none'; frame-ancestors 'none'"
+            ),
+            "X-Content-Type-Options": "nosniff",
+            "Referrer-Policy": "no-referrer",
+        })
+    # Reuse the public discovery contract; no feature or model reconstruction.
+    cohorts: list[CohortSummary] = []
+    offset = 0
+    while True:
+        page = predictions.list_cohorts(limit=100, offset=offset)
+        cohorts.extend(page.items)
+        offset += len(page.items)
+        if offset >= page.total:
+            break
+
+    @app.get("/api/demo/v1/vehicles", response_model=VehiclePage)
+    def vehicles(
+        make: str | None = Query(default=None, min_length=1),
+        model: str | None = Query(default=None, min_length=1),
+        year: int | None = Query(default=None, ge=1886, le=2100),
+        limit: int = Query(default=50, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+    ) -> VehiclePage:
+        try:
+            found = index.discover(make, model, year)
+        except ValueError as error:
+            raise HTTPException(422, "invalid dependent vehicle filters") from error
+        return VehiclePage(
+            items=[HistoricalVehicle(**v) for v in found[offset:offset + limit]],
+            total=len(found), limit=limit, offset=offset,
+            makes=sorted({v["make"] for v in found}),
+            models=sorted({v["model"] for v in found}) if make else [],
+            years=sorted({v["year"] for v in found}) if model else [],
+        )
+
+    @app.get("/api/demo/v1/vehicles/resolve", response_model=Resolution)
+    def resolve(make: str, model: str, year: int = Query(ge=1886, le=2100)) -> Resolution:
+        try:
+            candidates = [HistoricalVehicle(**v) for v in index.discover(make, model, year)]
+        except ValueError as error:
+            raise HTTPException(422, "invalid vehicle identity") from error
+        return Resolution(
+            status="unmatched" if not candidates else "matched" if len(candidates) == 1
+            else "ambiguous", candidates=candidates,
+        )
+
+    @app.get("/api/demo/v1/vehicles/{vehicle_id}/history", response_model=HistoricalSummary)
+    def history(vehicle_id: str) -> HistoricalSummary:
+        try:
+            return HistoricalSummary(**index.summary(vehicle_id))
+        except KeyError as error:
+            raise HTTPException(404, "historical vehicle not found") from error
+
+    @app.get("/api/demo/v1/vehicles/{vehicle_id}/prediction", response_model=PredictionLink)
+    def prediction_link(vehicle_id: str) -> PredictionLink:
+        try:
+            vehicle = index.summary(vehicle_id)["vehicle"]
+        except KeyError as error:
+            raise HTTPException(404, "historical vehicle not found") from error
+        matches = sorted(c.cohort_id for c in cohorts if (
+            c.make, c.model, c.model_year
+        ) == (vehicle["make"], vehicle["model"], vehicle["year"]))
+        # Never silently resolve an identity mismatch by make/model/year alone.
+        if matches == [vehicle_id]:
+            return PredictionLink(status="supported", cohort_ids=matches,
+                                  prediction_url=f"/api/v1/cohorts/{vehicle_id}")
+        return PredictionLink(status="ambiguous" if matches else "unsupported",
+                              cohort_ids=matches, prediction_url=None)
+
+    @app.get("/api/demo/v1/nlp/sample-summary", response_model=ExploratorySummary)
+    def sample_summary() -> ExploratorySummary:
+        path = root / G1_SUMMARY
+        marker = path.with_suffix(".json.provenance.json")
+        if not path.is_file() or not marker.is_file():
+            raise HTTPException(503, "bounded NLP summary unavailable")
+        provenance = json.loads(marker.read_text(encoding="utf-8"))
+        if provenance.get("complete") is not True or (
+            provenance.get("output_sha256") != sha256_file(path)
+        ):
+            raise HTTPException(503, "bounded NLP summary failed verification")
+        return ExploratorySummary(summary=json.loads(path.read_text(encoding="utf-8")),
+                                  provenance=provenance)
+
+    return app

@@ -1,5 +1,8 @@
 # Phase 5A FastAPI boundary
 
+For the optional local historical-data API and its separate application factory, see
+[Local demo backend](local-demo.md). It retains all four frozen endpoints unchanged.
+
 Phase 5A exposes the validated frozen presentation contract through a deliberately small
 HTTP application. API contract version `howreliable-api-1.0` is distinct from result contract
 version `complaint-activity-result-1.0`. The service predicts accepted observed NHTSA

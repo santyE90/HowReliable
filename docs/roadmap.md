@@ -97,7 +97,22 @@ implementation exists yet.
   Terraform CLI validation, live plan, apply, and all AWS acceptance remain unexecuted.
 - **Current project state — TERRAFORM IMPLEMENTATION COMPLETE.** Phase 8A is next; there is no
   claim that Terraform planned/applied against AWS or that GitHub Actions deployed live.
-- **Phase 8A — Owner Report NLP: planned**
+- **Phase 8A — Owner Report NLP: Milestones A through F implemented** — standalone offline
+  deterministic extraction scope, taxonomy v1, and annotation/evaluation protocol are defined
+  in the [specification](owner-report-nlp.md) and
+  [annotation guide](owner-report-nlp-annotation-guide.md). The synthetic-tested input adapter
+  provides streaming accounting, grouping, date controls, provenance and a local CLI.
+  C adds a versioned component lexicon and original-text mention spans. D adds a versioned
+  symptom lexicon, bounded assertion scope and conservative local associations, with legacy
+  NLP-schema compatibility. E persists disk-backed memberships, transitive duplicate-safe
+  evaluation keys and explicit temporal/eligible accounting. F adds verified, deterministic
+  descriptive summaries with distinct-report denominators and separate completion provenance.
+  Full-corpus NLP processing, annotation, evaluation and performance remain unimplemented
+  or unmeasured. See the specification for the updated Milestone F acceptance boundary.
+  G1 completed a bounded real-data smoke benchmark. G2A prepares reproducible blinded
+  100/100 development/held-out worksheets with global duplicate isolation; see the
+  [review workflow](owner-report-nlp-review-workflow.md). Human annotation, custody assignment
+  and scoring remain outstanding; G2A does not run full-corpus NLP.
 - **Phase 8B — Source Normalization: planned**
 - **Phase 8C — NLP Integration: planned**
 - **Phase 9 — Component-Level Prediction: planned**

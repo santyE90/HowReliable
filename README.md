@@ -1,9 +1,29 @@
 # HowReliable?
 
-HowReliable? is the foundation of a cloud-based vehicle maintenance and reliability
-intelligence platform. The long-term aim is to turn well-understood automotive data into
-probabilistic repair or failure-risk estimates while providing hands-on experience with
-machine learning, data science, and cloud/ML engineering.
+HowReliable? is a local portfolio demonstration of vehicle complaint intelligence from
+NHTSA data. Explore historical owner reports, a frozen historical complaint-activity forecast,
+and a clearly separated exploratory NLP sample. These outputs are not mechanical reliability
+ratings, defect rates, or individual failure probabilities.
+
+## Open the local demo
+
+With the existing Python environment, restored canonical model bundle, and H2 historical
+index available, run from the repository root:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn howreliable.demo.app:create_app --factory --host 127.0.0.1 --port 8000
+```
+
+Open **http://127.0.0.1:8000/**. Choose make, model, and year, then select **Explore vehicle**.
+Use **Ctrl+C** to stop. No AWS, Docker, frontend build, external CDN, or telemetry is involved.
+See the [demo walkthrough, prerequisites, and troubleshooting](docs/local-demo.md).
+
+**Where we left off:** H3.1 is complete and development is paused at the local portfolio demo.
+Historical complaint reports are the primary view; the frozen 2023 ML experiment and older global
+NLP sample are explicitly separate. The 20-report NLP challenge annotation remains deferred and
+preserved. See the [project checkpoint and optional H4 — Portfolio Readiness](docs/local-demo.md#where-we-left-off--h31-checkpoint-2026-11-02)
+for artifacts, last reported AWS status (not live-verified), and safe resumption steps. No cloud
+deployment or Terraform reconciliation is needed to launch locally.
 
 The planned stack includes Python, Pandas, NumPy, scikit-learn, PyTorch, FastAPI, Docker,
 AWS, GitHub Actions, and Terraform. These technologies will be introduced only when their
@@ -21,7 +41,8 @@ traditional baseline models on a separate as-of-cutoff feature matrix, a determi
 PyTorch Dataset/DataLoader pipeline, a first small validation-selected PyTorch MLP, and
 minimal reproducible/resumable training infrastructure and a local typed FastAPI boundary.
 The API now has a locally validated S3 and ECS Fargate deployment and monitoring
-implementation, but no live AWS deployment, cloud training, or user interface.
+implementation. H2/H3 additionally provide indexed local history queries and a browser
+dashboard. The local demo does not require the deployment infrastructure or cloud training.
 
 Phase 3F evaluates the frozen forest and MLP on aligned TEST predictions with deterministic
 bootstrap uncertainty, calibration, threshold sensitivity, subgroups, errors, and agreement.
@@ -246,6 +267,11 @@ python -c "import howreliable; print(howreliable.__version__)"
 ```
 
 ## Run the local API
+
+The optional [local browser demo](docs/local-demo.md) adds indexed historical complaint
+queries, vehicle discovery, and a consumer dashboard using local artifacts, with no AWS
+dependency. Use its factory above for the homepage; the original API factory below remains
+available for the unchanged frozen API.
 
 With all validated ignored artifacts available from the repository root:
 

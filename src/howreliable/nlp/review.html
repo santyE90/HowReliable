@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HowReliable development annotation</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body><main>
+<h1>Development annotation</h1>
+<p>Human review only. No predictions or automatic labels. Original text is read-only.</p>
+<div class="toolbar"><button id="previous">Previous</button><select id="reports" aria-label="Report"></select><button id="next">Next</button><button id="save">Save draft / status</button></div>
+<p id="progress"></p><p id="message" role="status" aria-live="polite"></p>
+<section><h2>Report review</h2><p id="identity"></p>
+<div class="grid"><label>Annotator ID<input id="annotator"></label><label>Independent reviewer ID<input id="reviewer"></label><label>State<select id="state"></select></label></div>
+<label>Reviewer / adjudication notes<textarea id="notes" rows="2"></textarea></label>
+<p>Annotated requires every variant completed. Reviewed additionally requires a different reviewer ID. Needs-adjudication requires notes.</p>
+<label>Narrative variant<select id="variants"></select></label><p id="metadata"></p>
+<pre id="narrative" tabindex="0" aria-label="Original narrative; select evidence here"></pre>
+<p id="selection">Select evidence in the narrative.</p>
+<label><input id="complete" type="checkbox">I have finished reviewing this variant</label>
+<label><input id="empty" type="checkbox">I explicitly confirm no component or symptom mentions in this variant</label>
+</section>
+<section><h2>Components and symptoms</h2>
+<p>Select text, choose a label and assertion, explain ambiguity (or why the referent is clear), then add. These are your labels, not suggestions.</p>
+<div class="grid"><label>Kind<select id="kind"><option value="component">Component</option><option value="symptom">Symptom</option></select></label>
+<label>Taxonomy label<select id="code"></select></label><label>Assertion<select id="assertion"></select></label></div>
+<label>Ambiguity / interpretation reason<input id="reason" placeholder="Required, including for clear mentions"></label>
+<label>Candidate codes (optional; use Ctrl/Cmd to select multiple)<select id="candidates" multiple></select></label>
+<div class="toolbar"><button id="add">Add selected evidence</button><button id="update" disabled>Update selected mention</button><button id="cue" disabled>Add selected text as cue</button><button id="cancel">Clear editor</button></div>
+<p>Updating uses newly selected evidence when present. Mention IDs remain stable on edit. Remove existing associations before changing their endpoint spans.</p>
+<div id="mentions"></div>
+</section>
+<section><h2>Explicit component–symptom associations</h2>
+<p>Choose your endpoints, select the supporting clause, and add only an explicitly supported relation. Unresolved endpoints cannot be linked.</p>
+<div class="grid"><label>Component mention<select id="component-endpoint"></select></label><label>Symptom mention<select id="symptom-endpoint"></select></label></div>
+<button id="associate">Add association using selection</button><div id="associations"></div>
+</section>
+<p>Save before navigating or closing. This tool does not establish annotation quality or replace independent review.</p>
+</main></body></html>

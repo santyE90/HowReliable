@@ -2,13 +2,21 @@
 
 ## Current implementation
 
+Milestone H2 adds an optional [local demo backend](local-demo.md): an explicitly built,
+narrative-free historical SQLite index and a separate FastAPI factory combining demo
+queries with the unchanged frozen prediction API. The index preserves source-row/report
+accounting and supports vehicle discovery beyond model coverage. H3 adds a same-origin,
+dependency-free HTML/CSS/JavaScript dashboard for vehicle discovery, historical counts,
+frozen 2023 forecasts, and the explicitly global bounded NLP sample. No full-corpus NLP
+processing or cloud change is part of these demo milestones.
+
 The repository contains an installable Python package, reusable configuration and logging
 foundations, immutable canonical vehicle and reliability-event models, source-specific NHTSA
 ingestion and mapping, reproducible EDA, deterministic cleaning, target/feature generation,
 traditional baselines, bounded neural training/evaluation, a typed API, a checksum-first
 registry, and local/S3 artifact stores. Tests and static-analysis configuration enforce these
 boundaries. A container/ECS Fargate deployment boundary is defined, but no live AWS service
-or UI component is implemented.
+is claimed by the local demo. Its browser UI is independent of cloud infrastructure.
 
 ### Vehicle identity decisions
 
