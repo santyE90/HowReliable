@@ -1,8 +1,20 @@
 # Local browser demo (Milestones H2–H3)
 
+**Current direction:** P1/P2 provide the [purchase-assessment workflow](purchase-assessment.md),
+using historical evidence and deterministic inspection prompts. H4 screenshots/recordings
+and the M1B–M3 count-forecast redesign are deferred. **Assess this vehicle** is the primary
+browser action; historical charts and separate ML/NLP panels remain available. The model is
+optional for purchase/history browsing; frozen prediction values and rules are unchanged. The checkpoint
+below preserves the earlier H3/H4 handoff history.
+
 ## Where We Left Off — H3.1 checkpoint (2026-11-02)
 
-Development is paused after local demo polish. H1 audited readiness, H2 built the historical
+This preserves the H3.1 handoff; development has resumed for H4 portfolio readiness.
+H4A audited the repository and H4B updates presentation/reproducibility documentation;
+H4C will capture actual screenshots and a walkthrough. See [reproducibility](reproducibility.md)
+for the clean-clone, historical-index, and full-demo setup levels, and
+[licensing status](licensing.md) for the pending owner decision.
+H1 audited readiness, H2 built the historical
 index/API, and H3/H3.1 added and refined the browser dashboard. The primary view is historical
 owner-reported complaints: unique reports, report-date timeline, structured components, and
 coverage. Source-row counts remain secondary. Readable component labels are presentation-only;
@@ -18,16 +30,16 @@ rules, and represents neither the selected vehicle nor the full corpus.
 
 ### Resume locally
 
-From `C:\Users\orjue\Documents\HowReliable`:
+From the repository root:
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn howreliable.demo.app:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
-Open **http://127.0.0.1:8000/**; stop with **Ctrl+C**. Required: the installed `.venv`, restored
-canonical `howreliable-rf-2022-cutoff-v1` bundle and all manifest-referenced files, plus
+Open **http://127.0.0.1:8000/**; stop with **Ctrl+C**. Required: the installed `.venv` plus
 `data/processed/demo/history-v1-20261102-v2.sqlite` and its `.provenance.json` sidecar.
-The G1 summary and sidecar described below are optional for the separate NLP panel.
+The canonical bundle is optional for the ML experiment, and the G1 summary/sidecar are optional
+for the separate NLP panel. Earlier H2/H3 handoff requirements below are superseded where noted.
 No rebuild, corpus processing, annotation, or cloud access is needed to resume the demo.
 
 The index contains 412,866 accepted source rows, 290,634 unique reports, and 10,670 vehicle
@@ -49,10 +61,11 @@ estimate. Artifact provisioning is still required on another computer; Git alone
   still declares desired count 1; historical deployment templates and older guardrail notes may
   describe the former ALB. Do not deploy or run Terraform to resume the local demo. Do not touch
   shared Identity Center/KMS resources.
-- Existing uncommitted/untracked work is preserved. H3.1 makes no commit and does not authorize
-  staging or publishing data, model bundles, annotation materials, or recovery/state files.
+- H3.1 changes were subsequently committed and pushed, as reported by the owner. H4 documentation
+  work does not authorize further commits or staging/publishing datasets, model bundles,
+  annotation materials, or recovery/state files. Preserve unrelated working-tree changes.
 
-### Next optional milestone: H4 — Portfolio Readiness
+### H4 — Portfolio Readiness
 
 Review GitHub presentation and repository hygiene without discarding local work: inspect the
 working tree, confirm ignored/private artifacts stay excluded, review obsolete deployment claims,
@@ -143,14 +156,16 @@ while serving. No source corpus scan occurs during requests.
 Open `http://127.0.0.1:8000/` for the dashboard, or `/docs` for API documentation.
 Stop the server with **Ctrl+C** in the terminal that launched it.
 The demo factory explicitly uses local model artifacts,
-even if the shell selects S3 for other tools. A validated canonical bundle and completed
-historical index are prerequisites. The original `howreliable.api.app:create_app` command
+even if the shell selects S3 for other tools. A completed historical index is required.
+The canonical model is optional: absent/invalid bundles make prediction endpoints return
+503 `MODEL_UNAVAILABLE` while purchase/history remain usable. Validation is not bypassed.
+The original `howreliable.api.app:create_app` command remains fail-closed by default and
 continues to expose only the original frozen API, without the demo homepage.
 
 ### Required artifacts and troubleshooting
 
 - Existing `.venv` with the installed project and pinned dependencies (Python 3.12+).
-- Complete restored `howreliable-rf-2022-cutoff-v1` registry bundle and its manifest-referenced
+- Optional for ML only: complete `howreliable-rf-2022-cutoff-v1` bundle and its manifest-referenced
   model, feature, target, handoff, evaluation, and explanation artifacts at their original paths.
 - `data/processed/demo/history-v1-20261102-v2.sqlite` and its checksum completion marker.
 - Optional G1 summary and provenance at
@@ -158,29 +173,33 @@ continues to expose only the original frozen API, without the demo homepage.
   `summary.json.provenance.json`. Missing G1 artifacts do not prevent history or predictions.
 
 Run from the repository root: artifact paths are relative to it. If startup fails, inspect
-the terminal for missing/checksum-invalid model or index artifacts; do not bypass validation
+the terminal for missing/checksum-invalid index artifacts; do not bypass validation
 or regenerate frozen files. For a missing historical index, use the explicit build command
 above only with absent destinations. An existing conflicting index is never overwritten.
 If port 8000 is busy, use `--port 8001` and the corresponding browser URL. Do not use the old
 API-only factory when expecting a homepage. If discovery fails, use **Retry catalog** after
-restoring server availability. Refresh after updating local assets; no service worker caches
+restoring server availability. A model-unavailable message is independent of purchase/history
+availability; restore and validate the original bundle, then restart to enable predictions.
+`/health` reports process liveness, not model readiness. Refresh after updating local assets; no service worker caches
 old assets. No API keys or `.env` file are needed for this local factory.
 
 ### Demo walkthrough
 
 1. Open the homepage; choose a make, then model, then year. Only facets and at most one
    vehicle item per discovery call are transferred; the entire catalog is not downloaded.
-2. Select **Explore vehicle**. Unique reports are primary; source-row totals retain duplicate
-   component rows. Inspect annual report-date counts, the structured-component chart/table,
-   unknown-date accounting, and expandable monthly counts and source provenance.
-3. Read the separate **Historical 2023 forecast** panel. Supported cohorts show the frozen
+2. Optionally enter kilometres and asking price in CAD, and choose maintenance-documentation
+   status (unknown by default). Select **Assess this vehicle**. Review complaint-supported versus
+   generic inspection advice, purchase considerations, and evidence limitations; no verdict is made.
+   Historical timeline/component charts follow, preserving report/row counts and coverage.
+3. Read the separate **Historical ML Experiment — 2023 Complaint Activity** panel. Supported cohorts show the frozen
    probability, classification/threshold, model contributors, evidence, limitations, and
    provenance. Unsupported/ambiguous matches show an unavailable explanation without estimates.
 4. Expand **Explore global NLP sample** independently of vehicle selection. This displays only
    the existing G1 summary, explicitly labelled as 1,000 rows / 691 reports with older rules.
    It never filters by the selected vehicle or triggers extraction.
-5. Change a selection or use **Reset** to clear vehicle results. Obsolete asynchronous responses
-   cannot replace results after a selection change. The global sample remains a separate view.
+5. Changing a vehicle, mileage, price, or maintenance field clears the assessment and invalidates
+   in-flight responses. Reassess to refresh. **Reset** also clears optional fields and resets
+   maintenance to unknown. The global sample remains a separate view.
 
 The dashboard uses native labelled controls, keyboard focus indicators, a skip link, live
 status messages, reduced-motion support, and responsive layouts. Charts have visible textual
@@ -190,8 +209,9 @@ external services, browser telemetry, or automatic annotations.
 
 ## Demo contract: `howreliable-demo-1.0`
 
-| GET route | Purpose |
+| Method and route | Purpose |
 |---|---|
+| `POST /api/demo/v1/purchase-assessments` | Deterministic purchase-context assessment; see the [typed contract](purchase-assessment.md) |
 | `/api/demo/v1/vehicles` | Historical vehicle discovery; optional make, model, year, limit, offset |
 | `/api/demo/v1/vehicles/resolve` | Exact normalized make/model/year resolution: matched, unmatched, ambiguous |
 | `/api/demo/v1/vehicles/{vehicle_id}/history` | Counts, monthly report-date timeline, structured components, provenance |

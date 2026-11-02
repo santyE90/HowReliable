@@ -1,5 +1,12 @@
 # Phase 6C monitoring
 
+> Historical infrastructure implementation reference, not current deployment instructions.
+> The last user-reported state is retired ALB/public IPv4/ENI and stopped ECS (0/0/0), with
+> S3 artifacts and ECR images retained. Terraform state was recovered; reconciliation is deferred.
+> Older validation statements and topology/desired-count examples below describe their original
+> checkpoints. No running service or live verification is implied. Local demo use does not require
+> AWS or Terraform; see the [current checkpoint](local-demo.md#deferred-work-and-infrastructure-boundary).
+
 Phase 6C implements operational observability contract `howreliable-monitoring-1.0` for
 the existing `howreliable-deployment-1.0` ECS Fargate design. It does not change the model,
 prediction contract, routes, or scientific interpretation. Monitoring implementation and

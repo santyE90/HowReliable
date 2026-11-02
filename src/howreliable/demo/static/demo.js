@@ -19,9 +19,12 @@
     if (cls) e.className = cls;
     return e;
   }
-  async function api(path) {
-    const response = await fetch(path, {credentials: "omit"});
-    if (!response.ok) throw new Error(`Local API request failed (HTTP ${response.status}). Check that the server and required artifacts are available.`);
+  async function api(path, options = {}) {
+    const response = await fetch(path, {...options, credentials: "omit"});
+    if (!response.ok) {
+      const reason = {404: "No exact historical vehicle match was found.", 409: "The vehicle identity is ambiguous; no match was guessed.", 422: "Check the vehicle and purchase inputs; the server rejected an invalid value.", 503: "This feature is unavailable. Historical evidence and purchase assessments may still be available."}[response.status] || "Check the local server and try again.";
+      throw new Error(`Local API request failed (HTTP ${response.status}). ${reason}`);
+    }
     return response.json();
   }
   function options(select, values, placeholder) {
@@ -35,12 +38,13 @@
   function clearResults() {
     resultVersion++;
     $("results").hidden = true;
-    $("history").replaceChildren(); $("prediction").replaceChildren();
+    $("assessment").replaceChildren(); $("history").replaceChildren(); $("prediction").replaceChildren();
     $("submit").disabled = !year.value;
   }
   async function discover(level) {
     const version = ++selectionVersion;
     clearResults(); $("retry").hidden = true;
+    $("submit").disabled = true;
     if (level === "make") options(make, [], "Loading makes…");
     options(year, [], "Choose a model first");
     if (level !== "year") options(model, [], "Choose a make first");
@@ -103,6 +107,36 @@
     metadata(container, "Monthly timeline and source-row counts", data.timeline);
     metadata(container, "Data coverage & provenance", data.provenance);
   }
+  function renderAssessment(data) {
+    const container = $("assessment");
+    const heading = node("h2", "Evidence-based purchase assessment");
+    heading.id = "assessment-title"; heading.tabIndex = -1;
+    container.replaceChildren(node("p", "PRIMARY VIEW / INSPECTION PREPARATION", "eyebrow"), heading,
+      node("p", "Historical complaint evidence and inspection prompts. Not an appraisal, reliability score, or buy/avoid verdict.", "notice"));
+    const context = data.purchase_context;
+    table(container, ["Odometer (km)", "Asking price (CAD)", "Maintenance history"], [[context.odometer_km === null ? "Not supplied" : number(context.odometer_km), context.asking_price_cad === null ? "Not supplied" : context.asking_price_cad, context.maintenance_history]], "Supplied purchase context · unverified, not inferred vehicle condition");
+    container.append(node("h3", "Reported component concerns"));
+    if (data.reported_component_concerns.length) {
+      table(container, ["Component", "Unique reports", "Source rows"], data.reported_component_concerns.map(c => [c.label, `${number(c.unique_report_count)} of ${number(c.total_unique_reports)}`, number(c.source_row_count)]), "Backend frequency order, not severity or mechanical risk; categories can overlap");
+      data.reported_component_concerns.forEach(c => container.append(node("p", c.interpretation, "muted")));
+    } else container.append(node("p", "No specific component concerns can be identified from the available structured labels. This does not establish a problem-free vehicle.", "muted"));
+    const coverage = data.component_coverage;
+    container.append(node("p", `Unknown/other labels: ${number(coverage.unknown_or_other_unique_reports)} of ${number(coverage.total_unique_reports)} unique reports; ${number(coverage.unknown_or_other_source_rows)} source rows. Specific-component labels: ${number(coverage.specific_component_unique_reports)} unique reports.`, "muted"), node("p", coverage.interpretation, "muted"));
+    for (const [basis, title] of [["complaint_supported", "Complaint-supported inspection prompts"], ["generic", "Generic inspection advice"]]) {
+      container.append(node("h3", title));
+      const list = node("ul");
+      data.inspection_priorities.filter(p => p.basis === basis).forEach(p => {
+        const li = node("li", p.suggestion);
+        if (p.supporting_unique_reports !== null) li.append(node("span", ` Supporting unique reports: ${number(p.supporting_unique_reports)}.`, "muted"));
+        list.append(li);
+      }); container.append(list);
+    }
+    container.append(node("h3", "Purchase considerations"));
+    data.purchase_considerations.forEach(c => {const p = node("p"); p.append(node("strong", `${c.topic}: `), document.createTextNode(c.explanation)); container.append(p);});
+    container.append(node("h3", "Evidence limitations"));
+    const limitations = node("ul"); data.evidence_limitations.forEach(text => limitations.append(node("li", text))); container.append(limitations);
+    metadata(container, "Assessment rules and policy", {schema_version: data.schema_version, methodology_version: data.methodology_version, policy: data.policy});
+  }
   async function renderPrediction(id, version) {
     const container = $("prediction"); container.replaceChildren(node("h2", experimentTitle), node("p", "Loading the frozen model result…", "muted"));
     try {
@@ -121,27 +155,40 @@
       container.append(node("p", `Historical complaint support: ${number(data.evidence.historical_complaint_support)} · cohort age at cutoff: ${data.evidence.cohort_age_years} years.`, "muted"), node("p", data.general_limitation, "notice"));
       data.limitation_flags.forEach(flag => container.append(node("p", `${flag.title}: ${flag.message}`, "muted")));
       metadata(container, "Historical evidence profile", data.evidence); metadata(container, "Model provenance & explanation method", {provenance: data.provenance, method: data.explanation.method});
-    } catch (error) {if (version === resultVersion) container.replaceChildren(node("h2", experimentTitle), node("p", error.message, "error"));}
+    } catch (error) {if (version === resultVersion) container.replaceChildren(node("h2", experimentTitle), node("p", "The frozen ML experiment is unavailable. Your purchase assessment and historical evidence remain available.", "notice"), node("p", error.message, "muted"));}
   }
   make.addEventListener("change", () => discover("model"));
   model.addEventListener("change", () => discover("year"));
   year.addEventListener("change", () => {clearResults(); status(year.value ? "Ready to explore this vehicle." : "Choose a model year.");});
-  $("reset").addEventListener("click", () => discover("make"));
+  $("reset").addEventListener("click", async () => {
+    $("odometer").value = ""; $("price").value = ""; $("maintenance").value = "unknown";
+    await discover("make"); if (!make.disabled) make.focus();
+  });
   $("retry").addEventListener("click", () => discover("make"));
+  for (const id of ["odometer", "price", "maintenance"]) {
+    for (const event of ["input", "change"]) $(id).addEventListener(event, () => {
+      clearResults(); status("Purchase context changed. Assess this vehicle again to refresh the results.");
+    });
+  }
+  $("vehicle-form").addEventListener("invalid", () => {
+    clearResults(); status("Check the highlighted inputs before requesting an assessment.", true);
+  }, true);
   $("vehicle-form").addEventListener("submit", async event => {
     event.preventDefault(); if (!make.value || !model.value || !year.value) return;
-    const version = ++resultVersion; $("submit").disabled = true; status("Loading historical reports…");
+    clearResults();
+    const version = resultVersion; $("submit").disabled = true; status("Preparing the purchase assessment…");
     try {
-      const q = new URLSearchParams({make: make.value, model: model.value, year: year.value});
-      const resolved = await api(`/api/demo/v1/vehicles/resolve?${q}`);
+      const odometer = $("odometer").value;
+      if (odometer !== "" && (!Number.isSafeInteger(Number(odometer)) || Number(odometer) < 0)) throw new Error("Enter an odometer reading as nonnegative whole kilometres within the browser's exact integer range.");
+      const payload = {make: make.value, model: model.value, year: Number(year.value), odometer_km: odometer === "" ? null : Number(odometer), asking_price_cad: $("price").value === "" ? null : $("price").value, maintenance_history: $("maintenance").value};
+      const data = await api("/api/demo/v1/purchase-assessments", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(payload)});
       if (version !== resultVersion) return;
-      if (resolved.status !== "matched" || resolved.candidates.length !== 1) throw new Error("No unique vehicle match. Refine or reset your selection; no identity has been guessed.");
-      const vehicle = resolved.candidates[0];
-      const data = await api(`/api/demo/v1/vehicles/${encodeURIComponent(vehicle.id)}/history`);
-      if (version !== resultVersion) return;
+      const vehicle = data.vehicle;
       $("vehicle-title").textContent = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
-      renderHistory(data); $("results").hidden = false; status("Historical reports loaded. The forecast and global NLP sample are separate views.");
-      await renderPrediction(vehicle.id, version);
+      renderAssessment(data); renderHistory(data.historical_evidence); $("results").hidden = false;
+      $("assessment-title").focus(); status("Purchase assessment loaded. Historical charts, the frozen experiment, and the global NLP sample remain separate views.");
+      // Optional ML must not keep the completed purchase assessment action disabled.
+      void renderPrediction(vehicle.id, version);
     } catch (error) {if (version === resultVersion) status(error.message, true);}
     finally {if (version === resultVersion) $("submit").disabled = false;}
   });

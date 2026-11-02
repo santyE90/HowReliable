@@ -1,5 +1,12 @@
 # Phase 6B AWS deployment
 
+> Historical infrastructure implementation reference, not current deployment instructions.
+> The last user-reported state is retired ALB/public IPv4/ENI and stopped ECS (0/0/0), with
+> S3 artifacts and ECR images retained. Terraform state was recovered; reconciliation is deferred.
+> Older validation statements and topology/desired-count examples below describe their original
+> checkpoints. No running service or live verification is implied. Local demo use does not require
+> AWS or Terraform; see the [current checkpoint](local-demo.md#deferred-work-and-infrastructure-boundary).
+
 ## Purpose and compute decision
 
 Phase 6B implements deployment contract `howreliable-deployment-1.0`. It packages the

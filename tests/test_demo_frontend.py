@@ -1,6 +1,7 @@
 """Local frontend serving and real-browser synthetic integration checks."""
 
 import json
+import re
 import socket
 import subprocess
 import threading
@@ -118,14 +119,33 @@ def test_browser_vehicle_workflow_safe_text_errors_and_mobile(
         (async () => {
           const el=id=>document.getElementById(id);
           const originalFetch=window.fetch.bind(window);
+          let sent=null, lastAssessment=null;
+          const recordingFetch=async(path,options)=>{
+            const response=await originalFetch(path,options);
+            if(String(path)==='/api/demo/v1/purchase-assessments'){
+              sent=JSON.parse(options.body);lastAssessment=await response.clone().json();
+            }return response;
+          };
+          window.fetch=recordingFetch;
           async function wait(fn){for(let i=0;i<400;i++){
             if(fn())return;await new Promise(r=>setTimeout(r,25));}throw Error('timeout');}
           function choose(id,value){el(id).value=value;el(id).dispatchEvent(new Event('change'));}
+          function input(id,value){el(id).value=value;el(id).dispatchEvent(new Event('input'));}
           try {
             await wait(()=>!el('make').disabled); choose('make','mazda');
             await wait(()=>!el('model').disabled); choose('model','mazda3');
-            await wait(()=>!el('year').disabled); choose('year','2020'); el('submit').click();
+            await wait(()=>!el('year').disabled); choose('year','2020');
+            input('odometer','300000');input('price','12000.50');choose('maintenance','partial');
+            el('submit').click();
             await wait(()=>el('prediction').textContent.includes('75.0%'));
+            if(sent.odometer_km!==300000||sent.asking_price_cad!=='12000.50'
+              ||sent.maintenance_history!=='partial')throw Error('request context');
+            if(!el('assessment').textContent.includes('particularly important'))
+              throw Error('mileage');
+            for(const text of ['Complaint-supported inspection prompts','Generic inspection advice',
+              'Unknown/other labels','Evidence limitations','No specific defect or repair']){
+              if(!el('assessment').textContent.includes(text))throw Error('assessment rendering');
+            }
             if(!el('history').textContent.includes('Unique reports'))throw Error('history');
             if(!el('history').textContent.includes('Airbags & restraints'))throw Error('labels');
             if(!el('history').textContent.includes('not vehicle failure rates'))
@@ -137,13 +157,78 @@ def test_browser_vehicle_workflow_safe_text_errors_and_mobile(
             if(parseFloat(getComputedStyle(el('prediction').querySelector('.probability')).fontSize)
                >=parseFloat(getComputedStyle(el('history').querySelector('.primary-metric strong'))
                  .fontSize))throw Error('hierarchy');
-            for(const id of ['make','model','year','submit']){
+            for(const id of ['make','model','year','odometer','price','maintenance','submit']){
               el(id).focus();if(document.activeElement!==el(id))throw Error('focus');}
             if(document.querySelector('img')||window.injected)throw Error('unsafe rendering');
             if(!el('prediction').textContent.includes('<img'))throw Error('escaped text missing');
+            let predictionRelease=null;
+            window.fetch=(path,options)=>String(path).endsWith('/prediction')
+              ? new Promise(resolve=>{predictionRelease=resolve;}):recordingFetch(path,options);
+            el('submit').click();
+            await wait(()=>predictionRelease!==null);
+            if(el('submit').disabled)throw Error('optional ML blocks assessment action');
+            predictionRelease(new Response(JSON.stringify({status:'unsupported'}),
+              {headers:{'Content-Type':'application/json'}}));
+            await wait(()=>el('prediction').textContent.includes('No frozen prediction'));
+            const hostile='<img src=x onerror="window.injected=true">';
+            window.fetch=async(path,options)=>{
+              const response=await recordingFetch(path,options);
+              if(String(path)!=='/api/demo/v1/purchase-assessments')return response;
+              const data=await response.json();
+              data.reported_component_concerns[0].label=hostile;
+              data.inspection_priorities[0].suggestion=hostile;
+              data.purchase_considerations[0].explanation=hostile;
+              data.evidence_limitations[0]=hostile;
+              data.historical_evidence.provenance.synthetic_note=hostile;
+              return new Response(JSON.stringify(data),
+                {headers:{'Content-Type':'application/json'}});
+            };
+            el('submit').click();
+            await wait(()=>el('assessment').textContent.includes(hostile));
+            if(document.querySelector('img')||window.injected)throw Error('unsafe assessment text');
+            window.fetch=recordingFetch;
+            input('price','14000.00');if(!el('results').hidden)throw Error('stale context');
+            el('submit').click();await wait(()=>el('prediction').textContent.includes('75.0%'));
+            let release=null;
+            window.fetch=(path,options)=>String(path)==='/api/demo/v1/purchase-assessments'
+              ? new Promise(resolve=>{release=resolve;}):recordingFetch(path,options);
+            el('submit').click();await wait(()=>release!==null);input('odometer','301000');
+            release(new Response(JSON.stringify(lastAssessment),
+              {headers:{'Content-Type':'application/json'}}));
+            await new Promise(r=>setTimeout(r,60));
+            if(!el('results').hidden||el('assessment').textContent)throw Error('stale response');
+            for(const code of [404,409,422,500]){
+              window.fetch=async(path,options)=>String(path)==='/api/demo/v1/purchase-assessments'
+                ? new Response('{}',{status:code}):recordingFetch(path,options);
+              el('submit').click();
+              await wait(()=>el('search-status').textContent.includes('HTTP '+code));
+              if(!el('results').hidden)throw Error('error retains old results');
+            }
+            window.fetch=recordingFetch;
+            input('price','1.001');el('submit').click();
+            if(!el('search-status').textContent.includes('highlighted inputs'))
+              throw Error('price validation');
+            input('price','');input('odometer','9007199254740992');el('submit').click();
+            if(!el('odometer').validity.rangeOverflow||document.activeElement!==el('odometer'))
+              throw Error('odometer native validation and focus');
+            input('price','');input('odometer','');choose('maintenance','unknown');
             choose('model','other'); await wait(()=>!el('year').disabled);
             choose('year','2020'); el('submit').click();
             await wait(()=>el('prediction').textContent.includes('No frozen prediction'));
+            if(sent.odometer_km!==null||sent.asking_price_cad!==null)
+              throw Error('optional fields');
+            let catalogRelease=null;
+            window.fetch=(path,options)=>String(path).startsWith('/api/demo/v1/vehicles?')
+              ? new Promise(resolve=>{catalogRelease=resolve;}):recordingFetch(path,options);
+            choose('make','mazda');
+            if(!el('submit').disabled)throw Error('assessment enabled during discovery');
+            choose('make','');
+            catalogRelease(new Response(JSON.stringify({models:['stale'],years:[],makes:[]}),
+              {headers:{'Content-Type':'application/json'}}));
+            await new Promise(r=>setTimeout(r,60));
+            if(!el('model').disabled||el('model').options.length!==1)
+              throw Error('stale vehicle discovery');
+            window.fetch=recordingFetch;
             el('load-nlp').click();
             await wait(()=>el('nlp-content').textContent.includes('Global G1 sample only'));
             el('reset').click(); await wait(()=>!el('make').disabled);
@@ -185,7 +270,10 @@ def test_browser_vehicle_workflow_safe_text_errors_and_mobile(
                 f"--window-size={width},900", "--dump-dom", "--virtual-time-budget=20000",
                 f"http://127.0.0.1:{port}",
             ], capture_output=True, timeout=45, creationflags=subprocess.CREATE_NO_WINDOW)
-            assert b'data-demo-smoke="passed"' in result.stdout, result.stdout[-2000:]
+            marker = re.search(rb'data-demo-smoke="([^"]*)"', result.stdout)
+            assert marker and marker.group(1) == b"passed", (
+                marker.group(1) if marker else b"browser did not finish"
+            )
     finally:
         server.should_exit = True
         thread.join(timeout=5)

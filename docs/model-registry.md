@@ -1,5 +1,9 @@
 # Phase 5B local model registry and loading
 
+For current setup levels, exact restoration requirements, and the unresolved public artifact
+distribution path, see [reproducibility](reproducibility.md). Validation does not acquire the
+bundle; a fresh clone alone does not contain its manifest or registered artifacts.
+
 Phase 5B formalizes the local artifact boundary behind the validated API. It is a small
 filesystem manifest and checksum-first loader, not training, model selection, experiment
 tracking, promotion, deployment, a database, or cloud storage.

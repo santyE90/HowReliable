@@ -6,9 +6,19 @@ Downloaded and generated data are intentionally excluded from Git.
 data/
   raw/nhtsa/complaints/       # immutable official ZIP artifacts
   interim/nhtsa/complaints/   # deterministic JSON Lines and provenance
-  processed/                  # reserved for later phases
+  processed/nhtsa/complaints/ # accepted clean rows, exclusions, and provenance
+  processed/modeling/        # frozen as-of feature data and split
+  processed/targets/         # historical complaint-activity targets and provenance
+  processed/demo/            # narrative-free SQLite history index and completion marker
+  processed/nlp/             # bounded exploratory extraction outputs; not full-corpus coverage
 ```
 
 Never edit or overwrite a raw artifact. Retrieve a newly published artifact under its
 official filename and use its SHA-256 checksum and provenance sidecar to distinguish it.
+
+The installed browser demo requires the generated index plus the separately restored
+canonical model bundle under ignored `artifacts/` and its registered data paths. Neither
+is delivered by a clean Git clone. See [reproducibility](../docs/reproducibility.md) and
+[local demo setup](../docs/local-demo.md). Do not commit datasets, indexes, models, or private
+annotation materials. Source terms and artifact distribution remain separate owner decisions.
 

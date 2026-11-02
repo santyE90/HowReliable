@@ -2,6 +2,12 @@
 
 ## Current implementation
 
+For the concise application overview and setup levels, see the [README](../README.md) and
+[reproducibility guide](reproducibility.md). Infrastructure sections below preserve historical
+implementation boundaries, not live service status; use the [local checkpoint](local-demo.md)
+for the last reported retirement/stoppage and deferred state reconciliation. The repository
+has no public canonical artifact delivery path and no explicit project license yet.
+
 Milestone H2 adds an optional [local demo backend](local-demo.md): an explicitly built,
 narrative-free historical SQLite index and a separate FastAPI factory combining demo
 queries with the unchanged frozen prediction API. The index preserves source-row/report

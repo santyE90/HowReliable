@@ -1,5 +1,26 @@
 # Roadmap
 
+## Current direction
+
+H2/H3/H3.1 deliver the local historical index/API and browser demo. H4A completed the
+repository audit; H4B documents presentation and reproducibility; actual screenshots and a
+short walkthrough are next in H4C. See [local demo](local-demo.md),
+[reproducibility](reproducibility.md), and [historical project overview](project-history.md).
+
+Further NLP research and the G2C.2 20-report challenge annotation are deferred indefinitely;
+retain all artifacts. Five development reports informed rule design, so exploratory NLP
+scores do not establish independent accuracy. No full-corpus NLP run is implied.
+
+AWS is not required for the local demo. The last reported state is stopped ECS and retired
+ALB, with S3/ECR artifacts preserved; Terraform state recovery is complete but reconciliation
+is deferred. See the [historical deployment status](local-demo.md#deferred-work-and-infrastructure-boundary).
+No live cloud or hosted CI verification was performed for H4B.
+
+## Implementation history
+
+The phase entries below preserve their original validation checkpoints. Older statements
+about unexecuted deployment/CI steps apply to those checkpoints, not to current resource status.
+
 Status markers: **complete** means implemented and validated; **planned** means no
 implementation exists yet.
 
@@ -95,8 +116,9 @@ implementation exists yet.
   established network, protected S3, immutable ECR, ECS/ALB foundation, distinct IAM roles,
   GitHub OIDC identity, logs, and four alarms. Static implementation validation is complete;
   Terraform CLI validation, live plan, apply, and all AWS acceptance remain unexecuted.
-- **Current project state — TERRAFORM IMPLEMENTATION COMPLETE.** Phase 8A is next; there is no
-  claim that Terraform planned/applied against AWS or that GitHub Actions deployed live.
+- **Historical Phase 7C checkpoint:** Terraform implementation was complete at that stage.
+  Current demo and deployment boundaries are described above; infrastructure reconciliation
+  is deliberately deferred.
 - **Phase 8A — Owner Report NLP: Milestones A through F implemented** — standalone offline
   deterministic extraction scope, taxonomy v1, and annotation/evaluation protocol are defined
   in the [specification](owner-report-nlp.md) and
@@ -107,14 +129,16 @@ implementation exists yet.
   NLP-schema compatibility. E persists disk-backed memberships, transitive duplicate-safe
   evaluation keys and explicit temporal/eligible accounting. F adds verified, deterministic
   descriptive summaries with distinct-report denominators and separate completion provenance.
-  Full-corpus NLP processing, annotation, evaluation and performance remain unimplemented
-  or unmeasured. See the specification for the updated Milestone F acceptance boundary.
+  Full-corpus NLP processing and independent quality evaluation remain deferred. See the
+  specification for the Milestone F acceptance boundary and bounded G1 performance evidence.
   G1 completed a bounded real-data smoke benchmark. G2A prepares reproducible blinded
   100/100 development/held-out worksheets with global duplicate isolation; see the
-  [review workflow](owner-report-nlp-review-workflow.md). Human annotation, custody assignment
-  and scoring remain outstanding; G2A does not run full-corpus NLP.
+  [review workflow](owner-report-nlp-review-workflow.md). At the G2A checkpoint, human annotation, custody assignment
+  and scoring were outstanding; G2A did not run full-corpus NLP. Subsequently, five development
+  reports were manually reviewed and scored, and targeted rules were improved. G2C.2 prepared
+  20 fresh challenge reports, whose annotation is now deferred; no independent quality claim follows.
 - **Phase 8B — Source Normalization: planned**
 - **Phase 8C — NLP Integration: planned**
 - **Phase 9 — Component-Level Prediction: planned**
-- **Phase 10 — Minimal Frontend: planned**
+- **Phase 10 — Minimal Frontend: local scope delivered in H3/H3.1**, without a cloud frontend deployment.
 - **Phase 11 — Production Readiness: planned**

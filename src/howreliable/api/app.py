@@ -10,7 +10,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Final, TextIO
 
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from starlette.responses import Response
 
@@ -60,6 +60,7 @@ def create_app(
     service: PredictionService | None = None,
     settings: Settings | None = None,
     log_stream: TextIO | None = None,
+    allow_model_unavailable: bool = False,
 ) -> FastAPI:
     """Create an application and initialize its validated service once."""
     resolved_settings = settings or Settings.from_env()
@@ -76,32 +77,46 @@ def create_app(
             "bundle_id": resolved_settings.model_bundle_id,
         },
     )
+    prediction_service: PredictionService | None
     try:
         prediction_service = service or PredictionService.load(
             resolved_root, settings=resolved_settings
         )
     except ArtifactContractError:
-        raise
-    metadata = prediction_service.metadata()
-    logger.info(
-        "API service initialized; frozen model ready",
-        extra={
-            "event": "service_ready",
-            "api_version": metadata.api_contract_version,
-            "deployment_contract_version": DEPLOYMENT_CONTRACT_VERSION,
-            "bundle_id": metadata.bundle_id,
-            "registry_version": REGISTRY_CONTRACT_VERSION,
-            "model_identifier": metadata.model_identifier,
-            "supported_cohort_count": SUPPORTED_COHORT_COUNT,
-        },
-    )
-
+        if not allow_model_unavailable:
+            raise
+        prediction_service = None
+        logger.warning("Frozen model unavailable; optional demo history remains available",
+                       extra={"event": "model_unavailable"})
+    if prediction_service is not None:
+        metadata = prediction_service.metadata()
+        logger.info(
+            "API service initialized; frozen model ready",
+            extra={
+                "event": "service_ready",
+                "api_version": metadata.api_contract_version,
+                "deployment_contract_version": DEPLOYMENT_CONTRACT_VERSION,
+                "bundle_id": metadata.bundle_id,
+                "registry_version": REGISTRY_CONTRACT_VERSION,
+                "model_identifier": metadata.model_identifier,
+                "supported_cohort_count": SUPPORTED_COHORT_COUNT,
+            },
+        )
     app = FastAPI(
         title="HowReliable? API",
         version=API_VERSION,
         description=DESCRIPTION,
     )
     app.state.prediction_service = prediction_service
+
+    def require_model() -> PredictionService:
+        if prediction_service is None:
+            raise HTTPException(503, detail={
+                "code": "MODEL_UNAVAILABLE",
+                "message": "The frozen model bundle is unavailable or failed validation. "
+                "Historical evidence and purchase assessments remain available in the demo.",
+            })
+        return prediction_service
 
     @app.middleware("http")
     async def request_logging(
@@ -201,7 +216,7 @@ def create_app(
         description="Returns safe metadata for the cohort complaint-activity model.",
     )
     def model_metadata() -> ModelMetadataResponse:
-        return prediction_service.metadata()
+        return require_model().metadata()
 
     @app.get(
         "/api/v1/cohorts",
@@ -213,7 +228,7 @@ def create_app(
         limit: int = Query(default=50, ge=1, le=100),
         offset: int = Query(default=0, ge=0),
     ) -> CohortPage:
-        return prediction_service.list_cohorts(limit=limit, offset=offset)
+        return require_model().list_cohorts(limit=limit, offset=offset)
 
     @app.get(
         "/api/v1/cohorts/{cohort_id}",
@@ -227,6 +242,6 @@ def create_app(
         ),
     )
     def cohort_prediction(cohort_id: str) -> ComplaintActivityResult:
-        return prediction_service.predict(cohort_id)
+        return require_model().predict(cohort_id)
 
     return app

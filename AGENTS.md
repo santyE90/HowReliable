@@ -36,14 +36,15 @@
 - Use AWS account `660097708945`, workload region `us-east-2`, and the existing
   SSO profile `SantyE90`. Verify the authenticated account before AWS work.
 - Do not guess SSO settings, create a new AWS account, or create long-lived keys.
-- The original Terraform state is on another computer. Do not initialize new
-  infrastructure state or run Terraform apply, destroy, or import.
+- Terraform state was recovered from the original computer; reconciliation is
+  deliberately deferred. Do not initialize new state or run Terraform operations
+  as part of local demo or portfolio work.
 - Do not deploy, modify, delete, or recreate AWS resources without explicit user
-  approval. Current setup authorization covers local development tools, AWS MCP,
-  skills, and agent guardrails only; cloud verification must be read-only.
-- ECS was manually scaled to desired count 0 to reduce costs. Preserve that
-  setting. The ALB may still incur charges. Terraform declares desired count 1;
-  a future apply could undo the manual scale-down.
+  approval. Local demo and documentation tasks do not authorize cloud access.
+- Last user-reported state: ECS desired/running/pending was 0/0/0; the ALB and
+  its managed public IPv4/ENI were retired October 26, 2026. S3 artifacts and ECR
+  images were retained. This is not live verification. Preserve the stopped ECS
+  setting. Terraform still declares desired count 1; a future apply could undo it.
 - Do not build or push Docker images during local setup.
 - Ask before making changes outside the local development environment.
 - Inspect existing tools and configuration before installing or replacing them.

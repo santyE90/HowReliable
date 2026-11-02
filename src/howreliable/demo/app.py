@@ -15,6 +15,12 @@ from howreliable.api.service import PredictionService
 from howreliable.config.settings import Settings
 from howreliable.data.ingestion.nhtsa_complaints import sha256_file
 from howreliable.demo.index import DEFAULT_INDEX, HistoricalIndex
+from howreliable.demo.purchase import (
+    PurchaseAssessmentService,
+    PurchaseVehicleAmbiguousError,
+    PurchaseVehicleNotFoundError,
+)
+from howreliable.demo.purchase_schemas import PurchaseAssessment, PurchaseAssessmentRequest
 from howreliable.demo.schemas import (
     ExploratorySummary,
     HistoricalSummary,
@@ -36,8 +42,22 @@ def create_app(
     index = HistoricalIndex(index_path or root / DEFAULT_INDEX)
     app = create_prediction_app(
         root=root, service=service, settings=Settings(artifact_backend="local"),
+        allow_model_unavailable=True,
     )
-    predictions: PredictionService = app.state.prediction_service
+    predictions: PredictionService | None = app.state.prediction_service
+    purchase_service = PurchaseAssessmentService(index)
+
+    @app.post("/api/demo/v1/purchase-assessments", response_model=PurchaseAssessment)
+    def purchase_assessment(request: PurchaseAssessmentRequest) -> PurchaseAssessment:
+        try:
+            return purchase_service.assess(request)
+        except PurchaseVehicleNotFoundError as error:
+            raise HTTPException(404, "no exact historical vehicle match") from error
+        except PurchaseVehicleAmbiguousError as error:
+            raise HTTPException(
+                409, "ambiguous historical vehicle identity; no match guessed",
+            ) from error
+
     static = Path(__file__).with_name("static")
     app.mount("/static", StaticFiles(directory=static), name="demo-static")
 
@@ -55,7 +75,7 @@ def create_app(
     # Reuse the public discovery contract; no feature or model reconstruction.
     cohorts: list[CohortSummary] = []
     offset = 0
-    while True:
+    while predictions is not None:
         page = predictions.list_cohorts(limit=100, offset=offset)
         cohorts.extend(page.items)
         offset += len(page.items)
@@ -106,6 +126,12 @@ def create_app(
             vehicle = index.summary(vehicle_id)["vehicle"]
         except KeyError as error:
             raise HTTPException(404, "historical vehicle not found") from error
+        if predictions is None:
+            raise HTTPException(503, detail={
+                "code": "MODEL_UNAVAILABLE",
+                "message": "Frozen model unavailable; purchase assessment and history "
+                "are available.",
+            })
         matches = sorted(c.cohort_id for c in cohorts if (
             c.make, c.model, c.model_year
         ) == (vehicle["make"], vehicle["model"], vehicle["year"]))
