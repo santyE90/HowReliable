@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -15,6 +16,8 @@ from howreliable.api.service import PredictionService
 from howreliable.config.settings import Settings
 from howreliable.data.ingestion.nhtsa_complaints import sha256_file
 from howreliable.demo.index import DEFAULT_INDEX, HistoricalIndex
+from howreliable.demo.pricing import compare_prices
+from howreliable.demo.pricing_schemas import PricingRequest, PricingResult
 from howreliable.demo.purchase import (
     PurchaseAssessmentService,
     PurchaseVehicleAmbiguousError,
@@ -46,6 +49,22 @@ def create_app(
     )
     predictions: PredictionService | None = app.state.prediction_service
     purchase_service = PurchaseAssessmentService(index)
+
+    @app.middleware("http")
+    async def pricing_no_store(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        response = await call_next(request)
+        if request.url.path == "/api/demo/v1/price-comparisons":
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.post("/api/demo/v1/price-comparisons", response_model=PricingResult)
+    def price_comparison(request: PricingRequest) -> PricingResult:
+        try:
+            return compare_prices(request)
+        except ValueError as error:
+            raise HTTPException(422, str(error)) from error
 
     @app.post("/api/demo/v1/purchase-assessments", response_model=PurchaseAssessment)
     def purchase_assessment(request: PurchaseAssessmentRequest) -> PurchaseAssessment:
