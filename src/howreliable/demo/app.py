@@ -18,6 +18,8 @@ from howreliable.data.ingestion.nhtsa_complaints import sha256_file
 from howreliable.demo.index import DEFAULT_INDEX, HistoricalIndex
 from howreliable.demo.pricing import compare_prices
 from howreliable.demo.pricing_schemas import PricingRequest, PricingResult
+from howreliable.demo.problem_profile import ProblemProfileService
+from howreliable.demo.profile_schemas import ProfileRequest, VehicleProblemProfile
 from howreliable.demo.purchase import (
     PurchaseAssessmentService,
     PurchaseVehicleAmbiguousError,
@@ -49,6 +51,20 @@ def create_app(
     )
     predictions: PredictionService | None = app.state.prediction_service
     purchase_service = PurchaseAssessmentService(index)
+    profile_service = ProblemProfileService(index)
+
+    @app.post(
+        "/api/demo/v1/vehicle-problem-profiles", response_model=VehicleProblemProfile,
+        responses={409: {"model": VehicleProblemProfile}, 503: {"model": VehicleProblemProfile}},
+    )
+    def vehicle_problem_profile(
+        request: ProfileRequest, response: Response,
+    ) -> VehicleProblemProfile:
+        profile = profile_service.profile(request)
+        response.status_code = {
+            "AMBIGUOUS_IDENTITY": 409, "SOURCE_UNAVAILABLE": 503,
+        }.get(profile.profile_status, 200)
+        return profile
 
     @app.middleware("http")
     async def pricing_no_store(

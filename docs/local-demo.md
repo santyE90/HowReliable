@@ -313,3 +313,28 @@ artifacts must be restored on another laptop; the repository alone is not a pack
 The 2023 forecast is historical and the NLP quality evidence is exploratory, not generalization
 evidence. Vehicle-specific NLP needs separately approved bounded processing and a versioned
 vehicle-scoped aggregation design. Full-corpus NLP and annotation work remain deferred.
+## Structured vehicle problem profile API (P6C)
+
+The local backend also supports `POST /api/demo/v1/vehicle-problem-profiles`.
+This is API-only; the dashboard does not display these profiles yet. Use the existing
+local launch command above, then in another PowerShell terminal:
+
+```powershell
+$body = @{ make = 'Toyota'; model = 'Corolla'; year = 2011 } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8000/api/demo/v1/vehicle-problem-profiles' `
+  -ContentType 'application/json' -Body $body
+```
+
+Schema `vehicle-problem-profile-1.0` embeds the historical summary once and adds component
+evidence references, conservative inspection questions, provenance and source availability.
+The immutable historical index is required; the frozen model bundle is optional.
+Exact matches return 200; no-match returns 200 with null history, ambiguity returns a typed
+409 profile, invalid requests return 422, and read/validation failure returns a typed 503
+profile. Missing/corrupt mandatory indexes still prevent startup.
+
+These US NHTSA reports are allegations, not verified failures or failure rates. Component
+categories overlap. Exact cohort matching does not establish trim, VIN or Canadian-market
+applicability. Recall/TSB evidence is unavailable locally, and validated NLP symptom evidence
+remains unavailable; null is not zero. Questions are inspection prompts, not diagnoses.
+This endpoint does not change purchase-readiness or asking-price comparison policy.
+See [the profile contract and evidence policy](vehicle-problem-profile.md) for details.
