@@ -7,6 +7,24 @@ browser action; historical charts and separate ML/NLP panels remain available. T
 optional for purchase/history browsing; frozen prediction values and rules are unchanged. The checkpoint
 below preserves the earlier H3/H4 handoff history.
 
+P4C adds optional expandable maintenance, condition, accident-history and inspection fields.
+Results show the supplied unverified details, missing information and deterministic follow-up
+questions. Unknown is the default; no problems reported is not verified problem-free condition.
+Inspection findings require a reported performed inspection; contradictory entries are rejected.
+Inputs are not persisted and do not alter historical evidence or the frozen ML experiment.
+P4B.2 manual NLP validation is deferred, its local worksheets are retained, and its findings
+are not exposed here. P4D adds a versioned `recommendation` response field using
+structured purchase context, with caution / insufficient information / conditional worth
+considering outcomes. P4E displays this unchanged recommendation near the top of results,
+with reasons, evidence origins, essential gaps, and expandable reconsideration conditions,
+limitations and technical rules. The negative outcome remains reserved/inactive. Guidance is
+conditional on verification, not a reliability score, mechanical inspection or market appraisal.
+Historical evidence, the frozen ML experiment and global NLP stay separate. Edits/reset clear
+the recommendation; late/mismatched responses cannot restore stale results. A missing/malformed
+recommendation shows an unavailable message while history remains usable. See the
+purchase-assessment decision table and P4E workflow.
+Startup and artifacts are unchanged.
+
 ## Where We Left Off — H3.1 checkpoint (2026-11-02)
 
 This preserves the H3.1 handoff; development has resumed for H4 portfolio readiness.

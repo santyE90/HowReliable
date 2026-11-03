@@ -7,11 +7,15 @@ from howreliable.demo.purchase_schemas import (
     AssessmentPolicy,
     ComponentConcern,
     ComponentCoverage,
+    IndividualVehicleContext,
+    IndividualVehicleDetails,
     InspectionPriority,
     PurchaseAssessment,
     PurchaseAssessmentRequest,
     PurchaseConsideration,
+    RecommendationInput,
 )
+from howreliable.demo.recommendations import recommend
 from howreliable.demo.schemas import HistoricalSummary
 from howreliable.domain.reliability import Component
 
@@ -77,6 +81,58 @@ class PurchaseVehicleNotFoundError(LookupError):
 
 class PurchaseVehicleAmbiguousError(LookupError):
     """Multiple historical identities; require explicit resolution rather than guessing."""
+
+
+def individual_context(request: PurchaseAssessmentRequest) -> IndividualVehicleContext:
+    """Deterministic evidence gaps and questions, with no risk or recommendation inference."""
+    fields = IndividualVehicleDetails.model_fields
+    supplied = IndividualVehicleDetails.model_validate({
+        name: getattr(request, name) for name in fields
+    })
+    missing = [
+        name for name in fields if getattr(supplied, name) in (None, "unknown", "unavailable")
+    ]
+    questions: list[str] = []
+    prompts = (
+        ("outstanding_maintenance", "Ask whether maintenance is outstanding and request records."),
+        ("mechanical_problems", "Ask about known mechanical problems; verify current condition."),
+        ("warning_lights", "Ask whether any dashboard warning lights are present."),
+        ("drivability_problems", "Ask about starting, stopping, steering and drivability issues."),
+        ("accident_history", "Ask about accident history and request supporting documentation."),
+        ("accident_documentation", "Request documents supporting the reported accident history."),
+    )
+    questions.extend(prompt for name, prompt in prompts if name in missing)
+    if supplied.outstanding_maintenance == "yes" and supplied.maintenance_notes is None:
+        questions.append("List outstanding maintenance and ask what work remains to be completed.")
+    if any(getattr(supplied, name) == "yes" for name in (
+        "mechanical_problems", "warning_lights", "drivability_problems"
+    )) and supplied.problem_description is None:
+        questions.append("Describe the reported problems and request an independent inspection.")
+    if supplied.accident_history == "yes" and supplied.accident_description is None:
+        questions.append("Request damage/repair details; accident status does not show severity.")
+    if supplied.inspection_status != "performed":
+        questions.append("Arrange an independent inspection or confirm one was performed.")
+    else:
+        if supplied.inspection_result in {"unavailable", "inconclusive"}:
+            questions.append("Obtain the inspection findings and clarify any inconclusive areas.")
+        if supplied.unresolved_inspection_issues == "unknown":
+            questions.append("Confirm whether any inspection issues remain unresolved.")
+        if supplied.inspection_result == "issues_found" and supplied.inspection_summary is None:
+            questions.append("Request a summary of the issues identified during inspection.")
+        if supplied.unresolved_inspection_issues == "yes":
+            questions.append("Ask an inspector to clarify unresolved findings and next steps.")
+    return IndividualVehicleContext(
+        supplied_information=supplied, missing_information=missing, follow_up_questions=questions,
+        evidence_limitations=[
+            "All supplied details are unverified user statements, including inspection summaries.",
+            "No problems reported is not independently verified problem-free condition.",
+            "Accident status alone does not establish damage severity or repair quality.",
+            "Unknown information is not evidence of absence; blank notes mean not supplied.",
+            "No documents are uploaded or verified. Do not include personal information in notes.",
+            "This context does not change historical complaint counts or produce a purchase "
+            "recommendation, valuation or risk estimate.",
+        ],
+    )
 
 
 def build_assessment(
@@ -172,6 +228,10 @@ def build_assessment(
                            "establish a recurring complaint pattern.")
     return PurchaseAssessment(
         vehicle=vehicle, purchase_context=request, historical_evidence=history,
+        individual_vehicle_context=individual_context(request),
+        recommendation=recommend(RecommendationInput.model_validate({
+            name: getattr(request, name) for name in RecommendationInput.model_fields
+        })),
         component_coverage=coverage, reported_component_concerns=concerns,
         inspection_priorities=priorities,
         purchase_considerations=[

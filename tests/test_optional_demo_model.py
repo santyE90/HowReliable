@@ -29,6 +29,22 @@ def test_missing_model_keeps_history_and_assessments_available(tmp_path: Path) -
     })
     assert result.status_code == 200
     assert result.json()["historical_evidence"]["unique_report_count"] == 1
+    expanded = client.post("/api/demo/v1/purchase-assessments", json={
+        "make": "mazda", "model": "mazda3", "year": 2020,
+        "mechanical_problems": "no", "inspection_status": "performed",
+        "inspection_result": "issues_found", "unresolved_inspection_issues": "yes",
+        "inspection_summary": "Synthetic brake-wear finding; not verified.",
+    })
+    assert expanded.status_code == 200
+    assert expanded.json()["historical_evidence"] == result.json()["historical_evidence"]
+    assert expanded.json()["individual_vehicle_context"]["supplied_information"][
+        "inspection_result"] == "issues_found"
+    invalid = client.post("/api/demo/v1/purchase-assessments", json={
+        "make": "mazda", "model": "mazda3", "year": 2020,
+        "inspection_status": "not_performed", "inspection_result": "no_issues_reported",
+    })
+    assert invalid.status_code == 422
+    assert "inspection_status=performed" in invalid.json()["detail"][0]["msg"]
     for url in ["/api/v1/model", "/api/v1/cohorts", f"/api/v1/cohorts/{identity}",
                 f"/api/demo/v1/vehicles/{identity}/prediction"]:
         response = client.get(url)

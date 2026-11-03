@@ -2,6 +2,19 @@
 (() => {
   const $ = id => document.getElementById(id);
   const make = $("make"), model = $("model"), year = $("year");
+  const contextControls = [...document.querySelectorAll("[data-context]")];
+  const contextLabel = key => $(key)?.labels?.[0]?.textContent || String(key).replaceAll("_", " ");
+  const outcomeLabels = {
+    INSUFFICIENT_INFORMATION: "Insufficient information",
+    PROCEED_WITH_CAUTION: "Proceed with caution",
+    WORTH_CONSIDERING: "Worth considering",
+    NOT_RECOMMENDED_UNDER_CURRENT_CONDITIONS: "Not recommended under current conditions"
+  };
+  const originLabels = {
+    user_supplied_condition: "User-supplied condition statement",
+    user_entered_inspection: "Inspection information entered by the user",
+    generic_purchase_guidance: "Generic purchase-process guidance"
+  };
   const number = value => Number(value).toLocaleString("en-US");
   // Presentation labels only; canonical category codes and analytics remain unchanged.
   const componentLabels = {
@@ -107,14 +120,74 @@
     metadata(container, "Monthly timeline and source-row counts", data.timeline);
     metadata(container, "Data coverage & provenance", data.provenance);
   }
+  function renderRecommendation(parent, data, vehicle) {
+    const section = node("section", undefined, "recommendation");
+    section.id = "recommendation"; section.setAttribute("aria-labelledby", "recommendation-title");
+    const heading = node("h3", "Purchase-readiness guidance"); heading.id = "recommendation-title";
+    section.append(heading, node("p", `${vehicle.year} ${vehicle.make} ${vehicle.model}`, "muted"));
+    parent.append(section);
+    const strings = value => Array.isArray(value) && value.every(item => typeof item === "string");
+    const valid = data && typeof data === "object" && typeof data.outcome === "string"
+      && Object.hasOwn(outcomeLabels, data.outcome)
+      && data.schema_version === "howreliable-purchase-recommendation-1.0"
+      && data.policy_version === "howreliable-purchase-readiness-policy-1.0"
+      && typeof data.explanation === "string" && data.explanation.trim()
+      && strings(data.missing_information) && strings(data.conditions_that_would_change_recommendation)
+      && strings(data.limitations) && strings(data.reserved_outcomes)
+      && Array.isArray(data.supporting_reasons) && data.supporting_reasons.length
+      && data.supporting_reasons.every(reason => reason && typeof reason === "object"
+        && typeof reason.explanation === "string" && typeof reason.rule_id === "string"
+        && typeof reason.next_step === "string" && strings(reason.evidence_fields)
+        && typeof reason.evidence_origin === "string" && Object.hasOwn(originLabels, reason.evidence_origin));
+    if (!valid) {
+      section.append(node("p", "Recommendation unavailable: the server did not return a supported, complete recommendation. Historical evidence and supplied context remain available. Reassess after checking the local server.", "notice"));
+      return "Recommendation unavailable";
+    }
+    const label = outcomeLabels[data.outcome];
+    section.append(node("p", label, "recommendation-outcome"), node("p", data.explanation),
+      node("p", "Purchase-readiness guidance, not a reliability score. User-supplied information is not independently verified. Historical NHTSA complaint evidence is separate from this decision, and asking price is not assessed against market values. An independent inspection remains important.", "notice"));
+    if (data.outcome === "NOT_RECOMMENDED_UNDER_CURRENT_CONDITIONS") section.append(node("p", "This outcome is reserved and inactive in the current policy. Its appearance is unexpected; verify the server response before relying on it.", "notice"));
+    section.append(node("h4", "Supporting reasons"));
+    const reasons = node("ul");
+    data.supporting_reasons.forEach(reason => {
+      const li = node("li", reason.explanation);
+      li.append(node("span", ` Evidence origin: ${originLabels[reason.evidence_origin]}.`, "muted"));
+      reasons.append(li);
+    });
+    section.append(reasons, node("h4", "Essential missing information"), node("p", data.missing_information.length ? data.missing_information.map(contextLabel).join(", ") : "No essential fields are missing. Supplied evidence still requires verification."));
+    const details = node("details"); details.append(node("summary", "Conditions that could change this recommendation"));
+    const conditions = node("ul"); data.conditions_that_would_change_recommendation.forEach(text => conditions.append(node("li", text)));
+    details.append(conditions); section.append(details);
+    const limits = node("details"); limits.append(node("summary", "Recommendation limitations"));
+    const list = node("ul"); data.limitations.forEach(text => list.append(node("li", text))); limits.append(list); section.append(limits);
+    metadata(section, "Technical rules and evidence provenance", {schema_version: data.schema_version, policy_version: data.policy_version, reasons: data.supporting_reasons, reserved_outcomes: data.reserved_outcomes});
+    return label;
+  }
   function renderAssessment(data) {
     const container = $("assessment");
     const heading = node("h2", "Evidence-based purchase assessment");
     heading.id = "assessment-title"; heading.tabIndex = -1;
     container.replaceChildren(node("p", "PRIMARY VIEW / INSPECTION PREPARATION", "eyebrow"), heading,
       node("p", "Historical complaint evidence and inspection prompts. Not an appraisal, reliability score, or buy/avoid verdict.", "notice"));
+    const recommendationLabel = renderRecommendation(container, data.recommendation, data.vehicle);
     const context = data.purchase_context;
     table(container, ["Odometer (km)", "Asking price (CAD)", "Maintenance history"], [[context.odometer_km === null ? "Not supplied" : number(context.odometer_km), context.asking_price_cad === null ? "Not supplied" : context.asking_price_cad, context.maintenance_history]], "Supplied purchase context · unverified, not inferred vehicle condition");
+    const individual = data.individual_vehicle_context;
+    if (individual) {
+      const individualDetails = node("details"); individualDetails.append(node("summary", "Individual vehicle details — unverified"));
+      table(individualDetails, ["Detail", "Supplied answer"], Object.entries(individual.supplied_information).map(([key, value]) => {
+        const control = $(key);
+        const label = control?.tagName === "SELECT" ? [...control.options].find(o => o.value === value)?.textContent : value;
+        return [contextLabel(key), value === null ? "Not supplied" : label || value];
+      }), "User statements only; no documents or actual vehicle condition verified");
+      individualDetails.append(node("h3", "Unknown or missing information"), node("p", individual.missing_information.length ? individual.missing_information.map(contextLabel).join(", ") : "No context fields are blank or unknown. This does not verify the supplied information."));
+      individualDetails.append(node("h3", "Follow-up questions and next steps"));
+      const questions = node("ul");
+      individual.follow_up_questions.forEach(text => questions.append(node("li", text)));
+      individualDetails.append(questions);
+      individual.evidence_limitations.forEach(text => individualDetails.append(node("p", text, "muted")));
+      container.append(individualDetails);
+    }
     container.append(node("h3", "Reported component concerns"));
     if (data.reported_component_concerns.length) {
       table(container, ["Component", "Unique reports", "Source rows"], data.reported_component_concerns.map(c => [c.label, `${number(c.unique_report_count)} of ${number(c.total_unique_reports)}`, number(c.source_row_count)]), "Backend frequency order, not severity or mechanical risk; categories can overlap");
@@ -133,9 +206,10 @@
     }
     container.append(node("h3", "Purchase considerations"));
     data.purchase_considerations.forEach(c => {const p = node("p"); p.append(node("strong", `${c.topic}: `), document.createTextNode(c.explanation)); container.append(p);});
-    container.append(node("h3", "Evidence limitations"));
-    const limitations = node("ul"); data.evidence_limitations.forEach(text => limitations.append(node("li", text))); container.append(limitations);
+    const evidenceDetails = node("details"); evidenceDetails.append(node("summary", "Evidence limitations"));
+    const limitations = node("ul"); data.evidence_limitations.forEach(text => limitations.append(node("li", text))); evidenceDetails.append(limitations); container.append(evidenceDetails);
     metadata(container, "Assessment rules and policy", {schema_version: data.schema_version, methodology_version: data.methodology_version, policy: data.policy});
+    return recommendationLabel;
   }
   async function renderPrediction(id, version) {
     const container = $("prediction"); container.replaceChildren(node("h2", experimentTitle), node("p", "Loading the frozen model result…", "muted"));
@@ -162,11 +236,14 @@
   year.addEventListener("change", () => {clearResults(); status(year.value ? "Ready to explore this vehicle." : "Choose a model year.");});
   $("reset").addEventListener("click", async () => {
     $("odometer").value = ""; $("price").value = ""; $("maintenance").value = "unknown";
+    contextControls.forEach(control => {control.value = control.tagName === "SELECT" ? control.options[0].value : "";});
+    $("inspection_status").setCustomValidity("");
     await discover("make"); if (!make.disabled) make.focus();
   });
   $("retry").addEventListener("click", () => discover("make"));
-  for (const id of ["odometer", "price", "maintenance"]) {
+  for (const id of ["odometer", "price", "maintenance", ...contextControls.map(control => control.id)]) {
     for (const event of ["input", "change"]) $(id).addEventListener(event, () => {
+      $("inspection_status").setCustomValidity("");
       clearResults(); status("Purchase context changed. Assess this vehicle again to refresh the results.");
     });
   }
@@ -181,12 +258,22 @@
       const odometer = $("odometer").value;
       if (odometer !== "" && (!Number.isSafeInteger(Number(odometer)) || Number(odometer) < 0)) throw new Error("Enter an odometer reading as nonnegative whole kilometres within the browser's exact integer range.");
       const payload = {make: make.value, model: model.value, year: Number(year.value), odometer_km: odometer === "" ? null : Number(odometer), asking_price_cad: $("price").value === "" ? null : $("price").value, maintenance_history: $("maintenance").value};
+      contextControls.forEach(control => {payload[control.id] = control.tagName === "SELECT" ? control.value : control.value.trim() ? control.value : null;});
+      const inspectionConflict = (payload.inspection_status !== "performed" && (payload.inspection_result !== "unavailable" || payload.unresolved_inspection_issues !== "unknown" || payload.inspection_summary !== null)) || (payload.inspection_result === "no_issues_reported" && payload.unresolved_inspection_issues === "yes");
+      if (inspectionConflict) {
+        $("inspection_status").closest("details").open = true;
+        $("inspection_status").setCustomValidity("Inspection findings require Performed. No issues reported cannot have unresolved issues marked Yes.");
+        $("inspection_status").reportValidity();
+        status("Check the inspection fields: findings require a performed inspection, and no issues reported conflicts with unresolved issues marked Yes.", true);
+        return;
+      }
       const data = await api("/api/demo/v1/purchase-assessments", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(payload)});
       if (version !== resultVersion) return;
       const vehicle = data.vehicle;
+      if (!vehicle || vehicle.make !== payload.make || vehicle.model !== payload.model || vehicle.year !== payload.year) throw new Error("The returned vehicle does not match your selection. Reassess; no recommendation was displayed.");
       $("vehicle-title").textContent = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
-      renderAssessment(data); renderHistory(data.historical_evidence); $("results").hidden = false;
-      $("assessment-title").focus(); status("Purchase assessment loaded. Historical charts, the frozen experiment, and the global NLP sample remain separate views.");
+      const recommendationLabel = renderAssessment(data); renderHistory(data.historical_evidence); $("results").hidden = false;
+      $("assessment-title").focus(); status(`Purchase assessment loaded. ${recommendationLabel}. Historical charts, the frozen experiment, and the global NLP sample remain separate views.`);
       // Optional ML must not keep the completed purchase assessment action disabled.
       void renderPrediction(vehicle.id, version);
     } catch (error) {if (version === resultVersion) status(error.message, true);}

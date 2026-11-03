@@ -161,6 +161,133 @@ def test_browser_vehicle_workflow_safe_text_errors_and_mobile(
               el(id).focus();if(document.activeElement!==el(id))throw Error('focus');}
             if(document.querySelector('img')||window.injected)throw Error('unsafe rendering');
             if(!el('prediction').textContent.includes('<img'))throw Error('escaped text missing');
+            const savedContext=[...document.querySelectorAll('[data-context]')]
+              .map(control=>[control.id,control.value]);
+            const favorable={maintenance:'documented',mechanical_problems:'no',warning_lights:'no',
+              drivability_problems:'no',outstanding_maintenance:'no',accident_history:'no',
+              accident_documentation:'documented',inspection_status:'performed',
+              inspection_result:'no_issues_reported',unresolved_inspection_issues:'no'};
+            const cases=[['Insufficient information',{maintenance:'unknown'}],
+              ['Worth considering',favorable],['Proceed with caution',{warning_lights:'yes'}]];
+            for(const [label,values] of cases){
+              for(const [id,value] of Object.entries(values))choose(id,value);
+              if(values.inspection_status==='performed')
+                input('inspection_summary','Synthetic reported inspection; verify records.');
+              el('submit').click();
+              await wait(()=>el('recommendation')?.textContent.includes(label));
+              if(el('recommendation').querySelector('.recommendation-outcome').textContent!==label)
+                throw Error('outcome label');
+              if(!el('search-status').textContent.includes(label))
+                throw Error('outcome announcement');
+              if(!el('recommendation').textContent.includes('Evidence origin:'))
+                throw Error('evidence origin missing');
+              if(!el('recommendation').textContent.includes('Conditions that could change'))
+                throw Error('reconsideration missing');
+              if(!el('recommendation').textContent.includes('Essential missing information'))
+                throw Error('missing information missing');
+              for(const reason of lastAssessment.recommendation.supporting_reasons){
+                if(!el('recommendation').textContent.includes(reason.explanation))
+                  throw Error('reason explanation missing');
+              }
+              for(const text of lastAssessment.recommendation
+                .conditions_that_would_change_recommendation){
+                if(!el('recommendation').textContent.includes(text))
+                  throw Error('reconsideration condition missing');
+              }
+              for(const key of lastAssessment.recommendation.missing_information){
+                if(!el('recommendation').textContent.includes(el(key)?.labels?.[0]?.textContent
+                  ||key.replaceAll('_',' ')))throw Error('missing field label');
+              }
+              if(document.activeElement!==el('assessment-title'))throw Error('result focus');
+              const summary=el('recommendation').querySelector('details summary');
+              summary.focus();if(document.activeElement!==summary)throw Error('details focus');
+              summary.click();if(!summary.parentElement.open)throw Error('details expand');
+              if(!el('recommendation').textContent.includes('independently verified'))
+                throw Error('qualification missing');
+              if(!el('recommendation').textContent.includes('2020 mazda mazda3'))
+                throw Error('recommendation identity');
+              if(lastAssessment.historical_evidence.unique_report_count!==1
+                ||lastAssessment.historical_evidence.source_row_count!==2)
+                throw Error('historical count changed');
+            }
+            for(const [id,value] of savedContext){
+              if(el(id).tagName==='SELECT')choose(id,value);else input(id,value);
+            }
+            choose('maintenance','partial');
+            const malformed=[null,{}, {outcome:'UNKNOWN'}, {outcome:{toString:null}},
+              {...lastAssessment.recommendation,supporting_reasons:[null]},
+              {...lastAssessment.recommendation,missing_information:'bad'},
+              {...lastAssessment.recommendation,conditions_that_would_change_recommendation:null},
+              {...lastAssessment.recommendation,schema_version:'unsupported'},
+              {...lastAssessment.recommendation,supporting_reasons:[{
+                ...lastAssessment.recommendation.supporting_reasons[0],
+                evidence_origin:'unknown-origin'}]}];
+            for(const broken of [undefined,...malformed]){
+              window.fetch=async(path,options)=>{
+                const response=await recordingFetch(path,options);
+                if(String(path)!=='/api/demo/v1/purchase-assessments')return response;
+                const data=await response.json();data.recommendation=broken;
+                return new Response(JSON.stringify(data),
+                  {headers:{'Content-Type':'application/json'}});
+              };
+              el('submit').click();
+              await wait(()=>el('recommendation')?.textContent
+                .includes('Recommendation unavailable'));
+              if(el('recommendation').querySelector('.recommendation-outcome'))
+                throw Error('malformed outcome displayed');
+              if(el('results').hidden||!el('history').textContent.includes('Unique reports'))
+                throw Error('malformed recommendation blocks history');
+            }
+            window.fetch=async(path,options)=>{
+              const response=await recordingFetch(path,options);
+              if(String(path)!=='/api/demo/v1/purchase-assessments')return response;
+              const data=await response.json();
+              data.recommendation.outcome='NOT_RECOMMENDED_UNDER_CURRENT_CONDITIONS';
+              data.recommendation.supporting_reasons[0].explanation=
+                '<img src=x onerror="window.injected=true">';
+              return new Response(JSON.stringify(data),
+                {headers:{'Content-Type':'application/json'}});
+            };
+            el('submit').click();
+            await wait(()=>el('recommendation')?.textContent.includes('reserved and inactive'));
+            if(!el('recommendation').textContent
+              .includes('Not recommended under current conditions'))
+              throw Error('reserved outcome label');
+            if(document.querySelector('img')||window.injected)throw Error('unsafe reason');
+            window.fetch=async(path,options)=>{
+              const response=await recordingFetch(path,options);
+              if(String(path)!=='/api/demo/v1/purchase-assessments')return response;
+              const data=await response.json();data.vehicle.model='wrong-vehicle';
+              return new Response(JSON.stringify(data),
+                {headers:{'Content-Type':'application/json'}});
+            };
+            el('submit').click();
+            await wait(()=>el('search-status').textContent
+              .includes('does not match your selection'));
+            if(!el('results').hidden||el('recommendation'))throw Error('wrong vehicle displayed');
+            window.fetch=recordingFetch;
+            el('major_repairs').closest('details').open=true;
+            input('major_repairs','<img src=x onerror="window.injected=true">');
+            choose('outstanding_maintenance','yes');
+            el('inspection_status').closest('details').open=true;
+            choose('inspection_status','not_performed');
+            choose('inspection_result','no_issues_reported');
+            el('submit').click();
+            await wait(()=>el('search-status').textContent.includes('Check the inspection fields'));
+            if(document.activeElement!==el('inspection_status'))throw Error('inspection focus');
+            choose('inspection_status','performed');choose('inspection_result','issues_found');
+            input('inspection_summary','Reported brake wear; not verified.');
+            choose('unresolved_inspection_issues','yes');
+            el('submit').click();
+            await wait(()=>!el('results').hidden);
+            if(sent.outstanding_maintenance!=='yes'||sent.inspection_status!=='performed'
+              ||!sent.inspection_summary)throw Error('expanded context payload');
+            if(!el('assessment').textContent.includes('<img src=x onerror='))
+              throw Error('expanded context echo');
+            if(document.querySelector('img')||window.injected)throw Error('unsafe user notes');
+            input('maintenance_notes','new note');
+            if(!el('results').hidden||el('recommendation'))throw Error('new context invalidation');
+            el('submit').click();await wait(()=>!el('results').hidden);
             let predictionRelease=null;
             window.fetch=(path,options)=>String(path).endsWith('/prediction')
               ? new Promise(resolve=>{predictionRelease=resolve;}):recordingFetch(path,options);
@@ -192,7 +319,8 @@ def test_browser_vehicle_workflow_safe_text_errors_and_mobile(
             let release=null;
             window.fetch=(path,options)=>String(path)==='/api/demo/v1/purchase-assessments'
               ? new Promise(resolve=>{release=resolve;}):recordingFetch(path,options);
-            el('submit').click();await wait(()=>release!==null);input('odometer','301000');
+            el('submit').click();await wait(()=>release!==null);
+            input('problem_description','Changed');
             release(new Response(JSON.stringify(lastAssessment),
               {headers:{'Content-Type':'application/json'}}));
             await new Promise(r=>setTimeout(r,60));
@@ -232,7 +360,11 @@ def test_browser_vehicle_workflow_safe_text_errors_and_mobile(
             el('load-nlp').click();
             await wait(()=>el('nlp-content').textContent.includes('Global G1 sample only'));
             el('reset').click(); await wait(()=>!el('make').disabled);
-            if(!el('results').hidden||!el('model').disabled)throw Error('reset');
+            if(!el('results').hidden||!el('model').disabled||el('recommendation'))
+              throw Error('reset');
+            if(el('inspection_status').value!=='unknown'||el('inspection_result').value!=='unavailable'
+              ||el('major_repairs').value!==''||el('maintenance_notes').value!=='')
+              throw Error('expanded context reset');
             window.fetch=async path=>String(path).startsWith('/api/demo/v1/vehicles?')
               ? new Response(JSON.stringify({makes:[],models:[],years:[],items:[],total:0}),
                 {headers:{'Content-Type':'application/json'}}):originalFetch(path);

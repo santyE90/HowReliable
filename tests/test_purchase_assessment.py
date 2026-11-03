@@ -300,3 +300,87 @@ def test_substantial_evidence_and_overlapping_unknown_coverage(tmp_path: Path) -
 def test_additional_invalid_numeric_context(values: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
         request(**values)
+
+
+def test_individual_context_defaults_and_legacy_compatibility(history: HistoricalIndex) -> None:
+    result = PurchaseAssessmentService(history).assess(request())
+    individual = result.individual_vehicle_context
+    assert individual.supplied_information.inspection_status == "unknown"
+    assert individual.supplied_information.inspection_result == "unavailable"
+    assert individual.supplied_information.mechanical_problems == "unknown"
+    assert individual.supplied_information.major_repairs is None
+    assert "warning_lights" in individual.missing_information
+    assert "major_repairs" in individual.missing_information
+    assert individual.follow_up_questions
+    assert result.schema_version == "howreliable-purchase-assessment-1.0"
+
+
+@pytest.mark.parametrize("changes", [
+    {"outstanding_maintenance": "maybe"}, {"mechanical_problems": True},
+    {"warning_lights": None}, {"drivability_problems": "none"},
+    {"accident_history": "never"}, {"accident_documentation": "verified"},
+    {"inspection_status": "done"}, {"inspection_result": "passed"},
+    {"unresolved_inspection_issues": False},
+    {"inspection_status": "not_performed", "inspection_result": "no_issues_reported"},
+    {"inspection_result": "issues_found"},
+    {"inspection_summary": "Reported findings"},
+    {"inspection_status": "not_performed", "unresolved_inspection_issues": "no"},
+    {"inspection_status": "performed", "inspection_result": "no_issues_reported",
+     "unresolved_inspection_issues": "yes"},
+])
+def test_individual_context_invalid_combinations(changes: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        request(**changes)
+
+
+@pytest.mark.parametrize("field", [
+    "major_repairs", "maintenance_notes", "problem_description", "accident_description",
+    "inspection_summary",
+])
+def test_individual_context_text_limits(field: str) -> None:
+    values: dict[str, object] = {"inspection_status": "performed", field: "x" * 500}
+    assert getattr(request(**values), field) == "x" * 500
+    values[field] = "x" * 501
+    with pytest.raises(ValidationError):
+        request(**values)
+    values[field] = "  "
+    assert getattr(request(**values), field) is None
+    values[field] = 123
+    with pytest.raises(ValidationError):
+        request(**values)
+
+
+def test_individual_details_preserve_evidence_and_are_deterministic(
+    history: HistoricalIndex,
+) -> None:
+    service = PurchaseAssessmentService(history)
+    base = service.assess(request())
+    context = request(
+        outstanding_maintenance="yes", maintenance_history="partial",
+        mechanical_problems="no", warning_lights="yes", drivability_problems="unknown",
+        accident_history="yes", accident_documentation="seller_reported",
+        inspection_status="performed", inspection_result="issues_found",
+        unresolved_inspection_issues="yes", inspection_summary=" Brake wear reported. ",
+        major_repairs="Battery replaced; documentation not verified.",
+    )
+    result = service.assess(context)
+    assert result.model_dump_json() == service.assess(context).model_dump_json()
+    assert result.historical_evidence == base.historical_evidence
+    assert result.reported_component_concerns == base.reported_component_concerns
+    assert result.inspection_priorities == base.inspection_priorities
+    individual = result.individual_vehicle_context
+    assert individual.supplied_information.inspection_summary == " Brake wear reported. "
+    assert "inspection_summary" not in individual.missing_information
+    assert "problem_description" in individual.missing_information
+    assert any("Describe the reported problems" in q for q in individual.follow_up_questions)
+    assert any("unresolved findings" in q for q in individual.follow_up_questions)
+    assert "not independently verified problem-free" in " ".join(individual.evidence_limitations)
+
+
+@pytest.mark.parametrize("result,unresolved", [
+    ("no_issues_reported", "no"), ("issues_found", "no"), ("issues_found", "yes"),
+    ("inconclusive", "unknown"), ("unavailable", "unknown"),
+])
+def test_performed_inspection_combinations(result: str, unresolved: str) -> None:
+    assert request(inspection_status="performed", inspection_result=result,
+                   unresolved_inspection_issues=unresolved).inspection_status == "performed"
