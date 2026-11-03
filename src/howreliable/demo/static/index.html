@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>HowReliable? | Vehicle complaint intelligence</title>
-  <link rel="stylesheet" href="/static/demo.css"><script src="/static/demo.js" defer></script><script src="/static/pricing.js" defer></script>
+  <link rel="stylesheet" href="/static/demo.css"><script src="/static/demo.js" defer></script><script src="/static/pricing.js" defer></script><script src="/static/profile.js" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to dashboard</a>
@@ -16,6 +16,15 @@
     <p id="search-status" role="status" aria-live="polite">Loading the local vehicle catalog…</p><button id="retry" class="secondary" type="button" hidden>Retry catalog</button>
   </section>
   <section id="results" hidden aria-labelledby="vehicle-title"><div class="result-heading"><div><p class="eyebrow">SELECTED VEHICLE / PURCHASE ASSESSMENT</p><h2 id="vehicle-title"></h2></div><span class="tag">Historical evidence, not a purchase verdict</span></div><div id="assessment" class="panel" aria-live="polite"></div><div id="history" class="panel" aria-live="polite"></div><div id="prediction" class="panel" aria-live="polite"></div></section>
+  <section class="panel" id="profile-panel" aria-labelledby="profile-title">
+    <p class="eyebrow">STRUCTURED HISTORICAL EVIDENCE / SEPARATE FROM PURCHASE READINESS</p>
+    <h2 id="profile-title">Vehicle Problem Profile</h2>
+    <p class="notice">U.S. NHTSA complaint reports are allegations, not verified failures. Inspection questions are prompts, not diagnoses. This profile does not change purchase-readiness guidance or asking-price comparisons.</p>
+    <p class="muted">Uses the selected make, model and year only. Configuration, individual VIN and Canadian-market applicability are not verified.</p>
+    <button id="profile-load" type="button" class="secondary" disabled aria-controls="profile-results" aria-describedby="profile-status">Load / refresh vehicle profile</button>
+    <p id="profile-status" role="status" aria-live="polite" aria-atomic="true">Choose make, model and year to load a profile.</p>
+    <div id="profile-results" hidden></div>
+  </section>
   <section class="panel" id="pricing-panel" aria-labelledby="pricing-title">
     <h2 id="pricing-title">Compare Asking Prices (optional)</h2>
     <p id="pricing-help" class="notice">Manually entered advertisements only, not a market valuation. Supply only facts you are permitted to share; manual copying does not grant redistribution rights. No listing URLs are retrieved. No photos, descriptions or personal information are needed. Entries stay in page memory and are lost on reload.</p>

@@ -1,6 +1,6 @@
 # P6B: vehicle problem profile contract and evidence policy
 
-Status: **P6C backend implemented; dashboard integration deferred to P6D**.
+Status: **P6C backend and P6D dashboard implemented**.
 Request/response contract: `vehicle-problem-profile-1.0`.
 Evidence/question policy: `howreliable-problem-evidence-policy-1.0`.
 
@@ -373,7 +373,7 @@ datasets or existing API contracts. Source acquisition and deployment remain out
 
 The response models live in `src/howreliable/demo/profile_schemas.py`. The thin indexed
 service and pure builder live in `src/howreliable/demo/problem_profile.py`; the demo app
-registers the endpoint. No profile evidence is displayed in the browser yet.
+registers the endpoint. P6D displays this unchanged contract in a separate dashboard panel.
 
 ```powershell
 $body = @{ make = 'BMW'; model = '335i'; year = 2011 } | ConvertTo-Json
@@ -402,7 +402,39 @@ dates, zero versus unavailable evidence, invalid requests, safe provenance and e
 Malformed dates are rejected by the existing clean-record validator before index publication;
 the profile neither reparses source records nor substitutes occurrence dates.
 
-P6D may add a separate dashboard section using this endpoint, preserving historical,
-purchase-readiness, pricing, frozen ML and exploratory NLP distinctions. It must render
-unavailable/ambiguous states, use safe text rendering and stale-response guards, and avoid
-presenting questions as diagnoses or structured counts as validated symptom evidence.
+## P6D dashboard workflow and safeguards
+
+The **Vehicle Problem Profile** panel sits between the selected-vehicle results and manual
+price comparisons. Select make/model/year and activate **Load / refresh vehicle profile**.
+It can be used without submitting a purchase assessment or loading the optional model.
+Only those three identity fields are sent; configuration is not inferred from pricing inputs.
+
+The overview shows canonical identity, unique reports, original source rows and valid
+report-date extrema. Expand the component section to view readable labels in backend order,
+supporting report counts and verbatim complaint-linked inspection questions grouped by
+category. Generic questions are separate. The existing history charts are reused rather than
+duplicated. Expandable date accounting preserves the null-month distinction; index provenance,
+source availability, mapping limitations, rule IDs and full caveats remain accessible.
+
+Recall/TSB and validated NLP evidence explicitly stay unavailable, never zero. Cohort matching,
+configuration applicability, individual VIN verification and Canadian-market applicability
+remain distinct. No experimental symptoms are surfaced, and no P4/P5 decisions change.
+
+`static/profile.js` validates the response version, identity snapshot, HTTP/status agreement,
+counts, component references/order, question support, source availability and applicability
+before publishing an off-DOM result. Unknown/malformed responses discard all profile evidence.
+All strings use text nodes; there is no HTML interpretation or external URL retrieval.
+Changing a vehicle or Reset clears results, aborts the request and increments a generation
+guard. Late responses cannot restore old evidence. Refresh disables its button while loading.
+Status announcements, result-heading focus, native expandable details and wrapping provenance
+reuse the dashboard's keyboard/focus and responsive styling.
+
+Synthetic desktop/mobile Edge tests cover success, overlapping categories, unknown/other,
+generic versus complaint-linked prompts, zero versus missing sources, typed no-match/409/503
+states, malformed references/counts, hostile text, network errors, rapid changes and Reset.
+Read-only browser smoke tests also check the restored BMW and Corolla cohorts in model-free
+mode and verify that the historical index checksum is unchanged.
+
+P6E remains a separate final validation/cleanup milestone: review real-vehicle presentation,
+wording and accessibility, verify P4/P5/history/ML/NLP separation, and record any concrete
+regressions. No new source recovery, diagnosis rules or NLP validation is implied by P6D.

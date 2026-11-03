@@ -313,11 +313,28 @@ artifacts must be restored on another laptop; the repository alone is not a pack
 The 2023 forecast is historical and the NLP quality evidence is exploratory, not generalization
 evidence. Vehicle-specific NLP needs separately approved bounded processing and a versioned
 vehicle-scoped aggregation design. Full-corpus NLP and annotation work remain deferred.
-## Structured vehicle problem profile API (P6C)
+## Vehicle Problem Profile (P6C backend / P6D dashboard)
 
-The local backend also supports `POST /api/demo/v1/vehicle-problem-profiles`.
-This is API-only; the dashboard does not display these profiles yet. Use the existing
-local launch command above, then in another PowerShell terminal:
+Choose a make, model and year, then use **Load / refresh vehicle profile** in the
+**Vehicle Problem Profile** panel below the vehicle results and above price comparisons.
+It works independently of **Assess this vehicle**, including when the model is unavailable.
+The selected identity appears in both the result heading and status announcement. No trim,
+powertrain or pricing configuration is inferred or sent to the profile endpoint.
+
+The overview distinguishes unique reports from duplicate-preserving source rows and shows
+the observed report-date period. Expand **View component counts and complaint-linked
+inspection questions** for the backend's frequency-ordered categories and unchanged prompts.
+Unknown/other labels remain visible without specific part-level questions. Generic inspection
+questions have their own heading. Existing historical charts remain the timeline visualization;
+the profile adds expandable date accounting, provenance, applicability and full limitations.
+
+Vehicle selection changes and Reset clear the profile and invalidate pending requests.
+Refresh clears previous evidence while loading. Malformed, mismatched and failed responses
+show no partial evidence. Profile loading does not modify P4 readiness or P5 comparisons;
+changing purchase-only inputs does not alter the identity-only profile.
+
+The backend still supports `POST /api/demo/v1/vehicle-problem-profiles` directly. Use the
+existing local launch command above, then in another PowerShell terminal:
 
 ```powershell
 $body = @{ make = 'Toyota'; model = 'Corolla'; year = 2011 } | ConvertTo-Json
