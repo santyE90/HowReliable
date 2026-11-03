@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>HowReliable? | Vehicle complaint intelligence</title>
-  <link rel="stylesheet" href="/static/demo.css"><script src="/static/demo.js" defer></script>
+  <link rel="stylesheet" href="/static/demo.css"><script src="/static/demo.js" defer></script><script src="/static/pricing.js" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to dashboard</a>
@@ -16,6 +16,24 @@
     <p id="search-status" role="status" aria-live="polite">Loading the local vehicle catalog…</p><button id="retry" class="secondary" type="button" hidden>Retry catalog</button>
   </section>
   <section id="results" hidden aria-labelledby="vehicle-title"><div class="result-heading"><div><p class="eyebrow">SELECTED VEHICLE / PURCHASE ASSESSMENT</p><h2 id="vehicle-title"></h2></div><span class="tag">Historical evidence, not a purchase verdict</span></div><div id="assessment" class="panel" aria-live="polite"></div><div id="history" class="panel" aria-live="polite"></div><div id="prediction" class="panel" aria-live="polite"></div></section>
+  <section class="panel" id="pricing-panel" aria-labelledby="pricing-title">
+    <h2 id="pricing-title">Compare Asking Prices (optional)</h2>
+    <p id="pricing-help" class="notice">Manually entered advertisements only, not a market valuation. Supply only facts you are permitted to share; manual copying does not grant redistribution rights. No listing URLs are retrieved. No photos, descriptions or personal information are needed. Entries stay in page memory and are lost on reload.</p>
+    <details><summary>Enter subject details and comparable advertisements</summary>
+      <p>Reuses make, model, year, asking price and odometer from the vehicle form above. Configuration and location below are pricing context only; unknown values are not inferred. Price positioning is separate from purchase readiness.</p>
+      <form id="pricing-form" autocomplete="off">
+        <div class="field"><label for="pricing-date">Comparison date</label><input id="pricing-date" type="date" required aria-describedby="pricing-help"></div>
+        <div id="pricing-subject-fields"></div>
+        <h3>Comparable advertisements (up to 10)</h3><p class="muted">Unknown details may produce contextual or excluded entries. Permission is not assumed. For a primary comparison, identify whether the entry is the subject vehicle and supply known configuration, province, condition, seller and tax/fee details.</p>
+        <div id="pricing-entries"></div>
+        <button id="pricing-add" type="button" class="secondary">Add comparable (copy selected make/model/year)</button>
+        <button id="pricing-submit" type="submit">Compare asking prices</button>
+        <button id="pricing-clear" type="button" class="secondary">Clear pricing entries</button>
+      </form>
+    </details>
+    <p id="pricing-status" role="status" aria-live="polite">Optional manual comparison. No external listing data is collected.</p>
+    <div id="pricing-results" hidden aria-live="polite"></div>
+  </section>
   <section class="panel nlp" id="nlp-panel" aria-labelledby="nlp-title"><div class="section-heading"><div><p class="eyebrow">EXPERIMENTAL / GLOBAL SAMPLE</p><h2 id="nlp-title">The language of owner reports</h2></div><span class="tag">Separate from vehicle results</span></div><p class="notice">1,000 source rows · 691 unique reports. This sample predates the latest NLP rules. It does not represent the complete corpus or all vehicles and is <strong>not specific to the selected vehicle</strong>. Extraction coverage is not accuracy.</p><button id="load-nlp" class="secondary" type="button">Explore global NLP sample</button><div id="nlp-content" aria-live="polite"></div></section>
   <aside class="limitations"><h2>Read the evidence with context.</h2><p>Complaint reporting is selective and has no vehicle-exposure denominator here. Counts are not defect rates, severity rankings, or reliability scores. Multiple source rows can describe one report. The frozen model forecasts historical 2023 complaint activity, not current or individual vehicle failure probability.</p></aside>
 </main><footer><span class="brand">HowReliable?</span><span>A local ML engineering portfolio demonstration · No telemetry or external services</span><a href="/docs">Explore the API</a></footer>

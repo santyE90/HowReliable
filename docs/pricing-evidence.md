@@ -1,9 +1,43 @@
-# P5B–P5C: manual Canadian asking-price evidence contract
+# P5B–P5E: manual Canadian asking-price evidence contract
 
-Status: **P5C backend implemented; no frontend integration**. Design version
+Status: **P5C backend and P5D manual dashboard implemented**. Design version
 `howreliable-pricing-design-1.0`; input schema
 `howreliable-pricing-input-1.0`, output schema `howreliable-pricing-comparison-1.0`,
 comparison policy `howreliable-manual-comparables-policy-1.0`.
+
+## P5E release validation
+
+P5E validates the manual local workflow; it does not validate asking prices as market values.
+Synthetic scenarios cover BMW/Corolla identities, zero/one/two/three/ten primary listings,
+all-contextual/all-excluded/mixed evidence, signed price positioning, odd/even medians,
+half-cent rounding, small/large values, both mileage boundaries, date boundaries, permission
+revocation and duplicate handling. A single extreme asking price can change the selected
+sample's range and median: the UI must not imply robustness or market representativeness.
+Changing eligibility removes that row from primary statistics rather than adjusting its price.
+Same-source/seller concentration does not establish independent or representative evidence.
+
+A regression reproduced an incomplete response-binding check: a returned subject with the
+same broad identity but a different asking price or odometer was accepted. P5E rejects those
+responses and mismatched comparable price, reading/unit, observation, permission, currency or
+price basis. Monetary equality uses decimal-string normalization (including leading/trailing
+zeros), never binary floating-point arithmetic. This is response validation, not a new pricing
+rule or calculation. Backend eligibility and P4 policies remain unchanged.
+
+Browser regression scenarios additionally cover network failures, out-of-order requests,
+reset/subject changes while pending, malformed responses, long/hostile source text, optional
+fields and focus/status behavior. Synthetic log checks confirm that source/permission facts
+are not included in successful or validation-error request logs. Listing references stay
+inert and request/response state is not persisted. Manual rights assertions and ad truth are
+still unverified. This release is a local descriptive comparison tool, not a validated appraisal,
+purchase guarantee, broad market survey or comprehensive accessibility certification.
+
+Release checks (2026-11-03): 262 relevant pytest cases passed; repository Ruff and mypy
+(148 source files) passed; both dashboard JavaScript files passed syntax checks. The existing
+Starlette/AnyIO deprecation warning remains. Real Edge checks used the existing index with
+the model unavailable for BMW/Corolla at 1280px and 390px viewports: native keyboard add/Tab,
+focus visibility, labels/status, expandable provenance and overflow checks passed. The index
+SHA-256 remained `e9e1fb211a6c7b7ac929c7e9deca6a48bc32ce7a818a7372ab028f32f2517948`.
+No P4, pricing policy, frozen ML, NLP or historical-data changes were required.
 
 ## Implemented P5C boundary
 
@@ -13,7 +47,63 @@ pure engine: `howreliable.demo.pricing.compare_prices`. No listing facts are per
 or logged. Responses including validation errors use `Cache-Control: no-store`. The existing
 demo factory still needs its historical index to start, but pricing never queries it or the
 model, and can compare vehicles outside historical coverage. The frozen API-only factory
-and all P4 contracts/policies are unchanged. The dashboard does not yet expose pricing.
+and all P4 contracts/policies are unchanged. P5D exposes this unchanged endpoint in the
+optional manual workflow below.
+
+## P5D manual dashboard workflow
+
+Select a vehicle and optionally enter asking price/kilometres in the existing purchase form.
+Expand **Compare Asking Prices**, then **Enter subject details and comparable advertisements**.
+Check the comparison date (initially today's local date, explicitly editable). Fill known
+subject configuration, province/city, seller, condition, history/title and tax/fee information.
+Unknowns are not inferred from P4 notes or complaint data and can prevent primary eligibility.
+Optional subject references help identify self-listings and are never retrieved.
+
+Select **Add comparable (copy selected make/model/year)**. Only broad identity is copied;
+check/edit it for the ad. Enter price, reading/unit, source, observation date, permission basis,
+reference and explicit attestation. Cash/CAD defaults describe this asking-price form; change
+them if the advertisement is different. No permission is assumed. Expand configuration and
+other evidence for optional fields including original listing date, listing/verification
+status, subject-vehicle indicator and duplicate references. IDs such as `entry_1` identify
+entries for confirmed/possible duplicate declarations. Synthetic and real entries cannot mix.
+
+Add/edit/remove up to ten entries, then explicitly select **Compare asking prices**. Fields
+need not be invented to submit an incomplete ad: the backend classifies missing evidence as
+contextual/excluded according to its existing rules. Native type/length checks and API errors
+help correct malformed inputs. No URLs, descriptions, photos, VINs or personal information
+are required. Manual copying does not grant redistribution rights.
+
+Results show primary/contextual/excluded counts, per-entry prices and signed price/mileage
+differences, eligibility reasons and warnings. Zero primary entries give an unavailable
+comparison; one/two show individual comparisons and extrema without a median. Three or more
+allow a selected-sample median and subject-minus-median difference. CAD amounts retain decimal
+strings; the median uses the backend's explicitly rounded display value. Contextual/excluded
+entries do not enter primary statistics. Expand provenance/reason details, coverage gaps,
+limitations and technical rules for full observations, source/reference, permission status,
+duplicate handling and input checksum. References render as inert text, never fetched links.
+
+Advertised prices are not verified transactions or market valuations. User facts are unverified,
+the selected sample may not represent the market, and mileage/condition/configuration differences
+are not converted into monetary adjustments. Pricing never changes P4 readiness or cancels
+inspection concerns. No browser price heuristics or new backend policy are introduced.
+
+Editing any pricing field or adding/removing entries clears price results. Shared P4 edits also
+invalidate pricing; make/model/year changes clear subject-specific pricing fields to unknown
+rather than carrying a previous configuration forward. Comparable entries remain visible for
+deliberate review, and mismatched identities are excluded by the engine. Late responses cannot
+restore invalidated results. Pricing-only edits leave P4 unchanged; shared P4 inputs retain
+their existing P4 invalidation behavior.
+
+**Clear pricing entries** resets pricing fields/results only. Global **Reset** clears both
+workflows. Entries/results stay in page/transient request memory, with autocomplete disabled
+and no local/session storage, cookies, database, export or provider requests. Reload loses
+the entries. Pricing requests use `cache: no-store`, matching the backend response header.
+
+Loading, validation/API errors and success are announced through a polite status region.
+Malformed/unsupported/mismatched responses do not display price conclusions or overwrite P4.
+Results receive heading focus; native labelled controls and expandable sections support
+keyboard review, add/remove actions manage focus, and responsive grids wrap long details.
+P5E supplies scenario/sensitivity and wording validation, not appraisal certification.
 
 P5C supersedes P5B's same-city guard, sparse minimum/maximum suppression and required
 comparable identity. Same province is required; city differences are disclosed warnings.
@@ -385,20 +475,20 @@ hidden earlier assessment or reinterpret text notes. The separate explicit POST
 is implemented in the demo API. It can operate without an index match/model because
 it compares submitted advertisements; display unmatched historical identity explicitly.
 
-P5D can add a compact optional comparable-entry section to the existing dashboard, returning
+P5D adds an optional comparable-entry section to the existing dashboard, returning
 price positioning alongside, not inside, P4 readiness. Use text nodes, labelled inputs,
 explicit manual submission, safe inert source references, no-store requests, version guards
 and reset behavior. Changing subject price/configuration or any comparable must invalidate
 price results. It must never automatically alter or override the P4 recommendation. A change
 to shared P4 inputs must also invalidate P4 results, preserving the existing behavior.
 
-P5E should test Decimal/rounding, boundary dates/mileage, incomplete advertisements,
+P5E tests Decimal/rounding, boundary dates/mileage, incomplete advertisements,
 duplicate order/permutation invariance, count conservation, exclusion precedence, no-network
 URL handling, no persistence, XSS-safe text, stale responses, sparse samples and unchanged P4
 outputs. Human review must confirm that labels cannot be mistaken for appraisal or verified
-condition. P5C synthetic tests cover the implemented engine; browser pricing integration remains P5D.
+condition. P5C–P5E tests cover the engine, browser and synthetic release scenarios.
 
-## P5C decisions and remaining P5D review
+## P5C policy decisions retained for release
 
 1. P5C approves full known configuration and same province for primary eligibility; seller/tax
    basis and known matching condition/history guards remain. Many ads may remain contextual.
@@ -415,4 +505,4 @@ condition. P5C synthetic tests cover the implemented engine; browser pricing int
 
 P4's recommendation policy remains unchanged. Permission checking is not legal certification;
 advertised condition is not inspected condition; selected asking prices are not transaction
-prices. P5C implements only the backend; P5D frontend work requires separate authorization.
+prices. P5E completes local workflow validation without changing the approved policy.

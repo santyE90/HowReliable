@@ -25,6 +25,29 @@ recommendation shows an unavailable message while history remains usable. See th
 purchase-assessment decision table and P4E workflow.
 Startup and artifacts are unchanged.
 
+P5D adds an optional **Compare Asking Prices** panel. Expand it, reuse the selected vehicle,
+price and odometer, enter known subject configuration/location, and manually add up to ten
+permitted comparable advertisements. Complete source/observation/permission information and
+expand configuration/evidence fields as available. Unknowns remain explicit. Select
+**Compare asking prices** to call the existing local pricing endpoint. See the
+[pricing workflow and contract](pricing-evidence.md) for fields and comparison rules.
+
+Results distinguish primary/contextual/excluded entries, display primary extrema and
+individual differences, and show a selected-sample median only at three primary entries.
+This is advertised-price positioning, not an appraisal or good-deal verdict. No URLs or
+external listings are retrieved; source facts and permissions remain unverified. Pricing
+stays separate from P4 readiness, history, ML and NLP. Edits invalidate pending results;
+vehicle changes clear subject-specific pricing details. Clear pricing entries/global Reset
+clear the relevant state, and reload loses comparables. No persistent listing storage, new
+dependencies or additional data artifacts are required.
+
+P5E completes the local manual-pricing validation pass. It adds strict response binding to
+the submitted subject price/odometer and comparable facts, with exact decimal-string checks.
+Synthetic scenarios exercise sparse/mixed samples, thresholds, permissions, duplicates,
+arithmetic and asynchronous failures. Advertised-price positioning remains separate from
+P4 readiness and is not an appraisal. User permissions, listing truth and market coverage
+are not independently verified; broader device/screen-reader certification is not claimed.
+
 ## Where We Left Off — H3.1 checkpoint (2026-11-02)
 
 This preserves the H3.1 handoff; development has resumed for H4 portfolio readiness.
