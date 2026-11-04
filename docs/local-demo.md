@@ -355,3 +355,25 @@ applicability. Recall/TSB evidence is unavailable locally, and validated NLP sym
 remains unavailable; null is not zero. Questions are inspection prompts, not diagnoses.
 This endpoint does not change purchase-readiness or asking-price comparison policy.
 See [the profile contract and evidence policy](vehicle-problem-profile.md) for details.
+
+### P6F checkpoint and release limitations
+
+P6F (2026-11-04) validates the local **structured-complaint-only** profile, including the
+BMW 335i and Toyota Corolla reference cohorts, model-free startup, desktop/mobile layouts,
+native keyboard controls and stale-response protection. P4 readiness, P5 pricing, historical
+charts, the frozen historical ML experiment and the global experimental NLP sample remain
+separate. Refresh requires a complete policy question set; truncated responses display no
+profile evidence.
+
+Recall/TSB and validated NLP evidence are not integrated. P6E found no corresponding verified
+source artifacts in the inspected locations. Official-source recovery and integration are
+deferred to **proposed P7**, subject to source/provenance verification and approval of a
+separate offline artifact plus API/client extensions. No recovery happens at startup or in
+HTTP requests. EWR remains outside the shopper-facing profile.
+
+The complete repository test run is not green on this laptop: legacy deployment/S3 contract
+fixtures and representative local explanations are missing, and one independent neural
+metric equality test differs by approximately 5.7e-11. A full-corpus PyTorch artifact test
+also skips absent inputs. These are separate from the passing local P6/P4/P5 workflow checks;
+see the profile document for exact paths and follow-up scope. Spoken screen-reader review
+was not performed; browser keyboard/focus and accessibility-tree checks are not certification.

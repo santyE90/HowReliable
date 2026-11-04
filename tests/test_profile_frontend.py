@@ -1,11 +1,14 @@
 """Desktop/mobile Edge profile workflows, isolated from P4/P5 and model availability."""
 
+import json
 import re
+import shutil
 import socket
 import subprocess
 import threading
 import time
 from pathlib import Path
+from urllib.request import urlopen
 
 import pytest
 import uvicorn
@@ -181,6 +184,7 @@ def test_profile_browser_synthetic_states(tmp_path: Path) -> None:
           d=>d.component_evidence[0].question_ids=['absent'],
           d=>d.inspection_questions[0].supporting_unique_report_count=999,
           d=>d.inspection_questions.push(d.inspection_questions[0]),
+          d=>{d.inspection_questions=[];d.component_evidence.forEach(a=>a.question_ids=[]);},
           d=>d.source_coverage.recalls.unique_record_count=0,
           d=>d.source_coverage.validated_symptoms.availability='AVAILABLE',
           d=>d.supplied_configuration={trim:'invented'}
@@ -225,11 +229,15 @@ def test_profile_browser_synthetic_states(tmp_path: Path) -> None:
         intercept(()=>reply(zero));await load();
         assert(el('profile-results').textContent.includes('Zero recorded reports'),'zero state');
         phase='pending and stale';
-        intercept(()=>new Promise(resolve=>{release=resolve;}));
-        el('profile-load').click();await wait(()=>release!==null);
+        let pendingSignal=null,pendingCalls=0;
+        intercept(options=>{pendingSignal=options.signal;pendingCalls++;
+          return new Promise(resolve=>{release=resolve;});});
+        el('profile-load').click();el('profile-load').click();await wait(()=>release!==null);
+        assert(pendingCalls===1,'repeated request while disabled');
         assert(el('profile-load').disabled&&el('profile-panel').getAttribute('aria-busy')===
           'true','busy');
         set('year','');assert(el('profile-results').hidden,'vehicle change invalidation');
+        assert(pendingSignal.aborted,'request cancellation');
         release(reply(clone()));await new Promise(r=>setTimeout(r,40));
         assert(el('profile-results').hidden,'stale response');
         set('year','2020');release=null;el('profile-load').click();
@@ -280,3 +288,125 @@ def test_real_cohorts_browser_model_free(tmp_path: Path) -> None:
       }catch(e){document.body.setAttribute('data-profile-smoke','failed:'+e.message);}
     })();''')
     assert sha256_file(index) == before
+
+
+def test_profile_native_keyboard_and_accessibility_tree(tmp_path: Path) -> None:
+    """Use native Edge key events through local CDP, without a browser dependency."""
+    edge = Path("C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe")
+    node = shutil.which("node")
+    if not edge.exists() or node is None:
+        pytest.skip("Installed Edge and Node are required for native keyboard checks")
+    index = tmp_path / "history.sqlite"
+    build_index(source_file(tmp_path, [record()]), index, TIME)
+    app = demo.create_app(root=tmp_path, index_path=index)
+    with socket.socket() as reservation:
+        reservation.bind(("127.0.0.1", 0))
+        port = reservation.getsockname()[1]
+    with socket.socket() as reservation:
+        reservation.bind(("127.0.0.1", 0))
+        debug_port = reservation.getsockname()[1]
+    server = uvicorn.Server(uvicorn.Config(
+        app, host="127.0.0.1", port=port, access_log=False, log_level="critical",
+    ))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    browser = subprocess.Popen([
+        str(edge), "--headless=new", "--disable-gpu", "--no-first-run",
+        "--no-default-browser-check", "--disable-extensions", "--disable-sync",
+        "--disable-background-networking", "--disable-component-update",
+        "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1",
+        "--remote-debugging-address=127.0.0.1", f"--remote-debugging-port={debug_port}",
+        f"--user-data-dir={tmp_path / 'keyboard-browser'}", "about:blank",
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        creationflags=subprocess.CREATE_NO_WINDOW)
+    try:
+        target = None
+        for _ in range(150):
+            try:
+                with urlopen(f"http://127.0.0.1:{debug_port}/json/list", timeout=.5) as response:
+                    pages = json.load(response)
+                target = next((p for p in pages if p.get("type") == "page"), None)
+                if target and server.started:
+                    break
+            except OSError:
+                pass
+            time.sleep(.05)
+        assert target is not None and server.started
+        script = r'''
+        const ws=new WebSocket(process.argv[2]);
+        await new Promise((resolve,reject)=>{ws.onopen=resolve;ws.onerror=reject;});
+        let next=0;const pending=new Map();
+        ws.onmessage=event=>{const r=JSON.parse(event.data), p=pending.get(r.id);
+          if(p){pending.delete(r.id);r.error?p.reject(Error(r.error.message)):p.resolve(r.result);}};
+        const send=(method,params={})=>new Promise((resolve,reject)=>{
+          const id=++next;pending.set(id,{resolve,reject});
+          ws.send(JSON.stringify({id,method,params}));});
+        const evaluate=async expression=>{
+          const result=await send('Runtime.evaluate',{
+            expression,awaitPromise:true,returnByValue:true});
+          if(result.exceptionDetails)throw Error('browser evaluation failed');
+          return result.result.value;
+        };
+        const check=async expression=>{if(!await evaluate(expression)){
+          const context=await evaluate(`JSON.stringify({active:document.activeElement?.id,
+            status:document.getElementById('profile-status')?.textContent})`);
+          throw Error(expression+' '+context);}};
+        const key=async(key,code,number)=>{
+          await send('Input.dispatchKeyEvent',{
+            type:'keyDown',key,code,windowsVirtualKeyCode:number,
+            text:key==='Enter'?'\r':key===' '?' ':''});
+          await send('Input.dispatchKeyEvent',{
+            type:'keyUp',key,code,windowsVirtualKeyCode:number});};
+        try{
+          await send('Page.navigate',{url:process.argv[3]});
+          await send('Emulation.setFocusEmulationEnabled',{enabled:true});
+          await send('Page.bringToFront');
+          for(let i=0;i<200;i++){
+            if(await evaluate("!!document.querySelector('#make:not(:disabled)')"))break;
+            await new Promise(r=>setTimeout(r,25));
+          }
+          await evaluate(`(async()=>{
+            const el=id=>document.getElementById(id), wait=async fn=>{
+              for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,20));}
+              throw Error('selection timeout');};
+            const set=(id,v)=>{el(id).value=v;el(id).dispatchEvent(new Event('change'));};
+            set('make','mazda');await wait(()=>!el('model').disabled);set('model','mazda3');
+            await wait(()=>!el('year').disabled);set('year','2020');el('profile-load').focus();
+          })()`);
+          await check("document.activeElement.id==='profile-load'");
+          await key('Enter','Enter',13);
+          for(let i=0;i<200;i++){
+            if(await evaluate("!!document.getElementById('profile-result-title')"))break;
+            await new Promise(r=>setTimeout(r,25));
+          }
+          await check("document.activeElement.id==='profile-result-title'");
+          await check("getComputedStyle(document.activeElement).outlineStyle==='solid'");
+          await key('Tab','Tab',9);
+          await check("document.activeElement.matches('#profile-results summary')");
+          await key(' ','Space',32);
+          await check("document.querySelector('#profile-results details').open");
+          await key('Tab','Tab',9);
+          await check("document.activeElement.matches('.profile-component summary')");
+          await key('Enter','Enter',13);
+          await check("document.activeElement.parentElement.open");
+          await check("document.querySelector('[id=profile-status][aria-live=polite]')!==null");
+          const tree=await send('Accessibility.getFullAXTree');
+          if(!tree.nodes.some(n=>n.role?.value==='status')||!tree.nodes.some(n=>
+            n.role?.value==='heading'&&n.name?.value==='Vehicle Problem Profile'))
+            throw Error('accessibility tree headings/status missing');
+          console.log('native keyboard and accessibility tree passed');
+        }finally{await send('Browser.close').catch(()=>{});ws.close();}
+        '''
+        result = subprocess.run([
+            node, "--input-type=module", "-", target["webSocketDebuggerUrl"],
+            f"http://127.0.0.1:{port}/",
+        ], input=script, text=True, capture_output=True, timeout=35,
+            creationflags=subprocess.CREATE_NO_WINDOW)
+        assert result.returncode == 0, result.stderr
+        assert "native keyboard and accessibility tree passed" in result.stdout
+    finally:
+        if browser.poll() is None:
+            browser.terminate()
+        browser.wait(timeout=10)
+        server.should_exit = True
+        thread.join(timeout=5)

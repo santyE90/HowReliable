@@ -1,6 +1,7 @@
 # P6B: vehicle problem profile contract and evidence policy
 
-Status: **P6C backend and P6D dashboard implemented**.
+Status: **P6F validated for the local structured-complaint demo; repository-wide test
+failures remain documented below**.
 Request/response contract: `vehicle-problem-profile-1.0`.
 Evidence/question policy: `howreliable-problem-evidence-policy-1.0`.
 
@@ -435,6 +436,85 @@ states, malformed references/counts, hostile text, network errors, rapid changes
 Read-only browser smoke tests also check the restored BMW and Corolla cohorts in model-free
 mode and verify that the historical index checksum is unchanged.
 
-P6E remains a separate final validation/cleanup milestone: review real-vehicle presentation,
-wording and accessibility, verify P4/P5/history/ML/NLP separation, and record any concrete
-regressions. No new source recovery, diagnosis rules or NLP validation is implied by P6D.
+## P6E recovery audit and proposed P7 prerequisites
+
+P6E was a read-only official-evidence recovery audit. The expected raw, processed and
+manifest/provenance paths for recalls, manufacturer communications and EWR were absent from
+the project and their corresponding paths in the previously named migration recovery folder.
+The model bundle contains derived features, not recoverable campaign/document evidence.
+Historical documentation of successful processing is not proof that the source files exist.
+No acquisition, rebuilding or integration was performed.
+
+Additional official-source integration is deferred to **proposed P7**, requiring approval:
+
+1. Locate verified original processed records, applicability and provenance on the original
+   desktop/backup; otherwise approve verified-raw reprocessing or a new official acquisition.
+   A new snapshot must not masquerade as the historical snapshot.
+2. Verify trusted checksums, source scope/dictionaries, versions, dates, identities, unique
+   campaigns/documents, application relationships and completion before restoring anything.
+3. Approve a separate versioned offline serving artifact with indexed identity lookup,
+   source-specific completeness, atomic publication and unavailable-source behavior. Preserve
+   the immutable complaint index and model-free startup; do not require EWR cross-source
+   diagnostics merely to serve recall or communication evidence.
+4. Approve typed API and frontend extensions: the current contract deliberately requires
+   official-source records to be null, and the client rejects populated/available evidence.
+5. Validate source-specific applicability and U.S./Canadian/VIN limitations before display.
+   Broad matches do not establish current open recalls, remedy completion, individual condition,
+   exact configuration or Transport Canada applicability.
+
+EWR production and unvalidated NLP symptoms remain outside this proposed official-evidence
+integration. P7 is not authorized or implemented by completion of P6.
+
+## P6F final release validation (2026-11-04)
+
+The released P6 scope is **structured historical NHTSA complaint evidence only**.
+Recall campaigns, manufacturer communications/TSBs and validated NLP evidence remain
+explicitly unavailable with null counts/records. Inspection questions remain conservative
+prompts rather than diagnoses, and no complaint count becomes a failure rate or purchase score.
+
+The profile summary exactly matched the existing history endpoint for both reference cohorts:
+
+| Cohort | Reports / source rows | Valid report-date extrema | Missing-date rows / unknown-month reports |
+| --- | --- | --- | --- |
+| 2011 BMW 335i | 22 / 35 | 2020-06-19 to 2024-10-22 | 0 / 0 |
+| 2011 Toyota Corolla | 23 / 32 | 2020-05-08 to 2024-02-06 | 0 / 0 |
+
+All component counts/order, timeline totals, question support and provenance were retained.
+The respective 31 and 28 overlapping component-report counts are not substituted for the
+22 and 23 cohort report totals. Synthetic tests cover absent/conflicting dates and zero
+versus unavailable evidence, which these two real cohorts do not exercise.
+Repeated requests produced identical bytes. The historical index checksum remained
+`e9e1fb211a6c7b7ac929c7e9deca6a48bc32ce7a818a7372ab028f32f2517948`.
+
+One frontend validation bug was reproduced and fixed: a response could omit all inspection
+questions and their references while being displayed as complete. The client now requires
+the policy's expected component-linked questions followed by both generic questions.
+Backend schema, question policy, counts and P4/P5 decisions are unchanged.
+
+Desktop/mobile Edge checks at 1200px and 390px cover real and synthetic cohorts, hostile text,
+long provenance, no horizontal overflow, source states, malformed responses, repeated requests,
+actual abort signals, stale responses and Reset. Native keyboard events additionally verify
+Enter activation, Tab navigation, Space/Enter expansion and visible result-heading focus.
+The browser accessibility tree exposes the profile heading and status region. Spoken
+screen-reader testing was not performed: Narrator is present, but an interactive spoken-output
+review is unavailable in this automated/headless session. These checks are not accessibility
+certification.
+
+The focused P6/P4/P5/demo/API/monitoring regression group passed all **301 tests**.
+The complete run finished with **931 passed, 5 failed, 7 setup errors and 1 skipped**.
+Ruff, mypy across 152 files, JavaScript syntax and documentation link checks passed.
+The complete regression run exposes unrelated legacy issues on this laptop:
+
+- Three deployment tests require absent `artifacts/cloud/deployment-contract.json`.
+- One S3 contract test requires absent `artifacts/cloud/s3-contract.json`.
+- Seven presentation setup errors require absent
+  `artifacts/explainability/representative-local-explanations.json`.
+- The neural early-stopping test uses exact equality for a recomputed metric that differs by
+  approximately 5.7e-11. It reproduces separately; no neural code or tolerance was changed.
+- One existing full-corpus PyTorch artifact test is skipped because its inputs are absent.
+- The existing Starlette/AnyIO deprecation warning remains.
+
+No missing artifacts were recovered or regenerated, tests were not weakened, and no canonical
+model was trained or modified. P6 is suitable for the provisioned local complaint-only demo;
+a claim that the entire repository release gate is green must wait for the independent
+fixture/numerical-test issues to be resolved under separate scope.

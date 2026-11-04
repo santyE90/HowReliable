@@ -62,6 +62,10 @@
       return q.evidence_basis === "structured_component_reports" && c && !["other", "unknown"].includes(q.supporting_component) && c.unique_report_count > 0 && q.supporting_unique_report_count === c.unique_report_count && data.component_evidence.some(a => a.category === q.supporting_component && a.question_ids.includes(q.question_id));
     })) return false;
     if (!data.component_evidence.every(a => a.question_ids.every(id => data.inspection_questions.some(q => q.question_id === id && q.supporting_component === a.category)))) return false;
+    // Missing questions must not make a truncated policy response look complete.
+    const expectedQuestions = [...components.values()].filter(c => c.unique_report_count > 0 && !["other", "unknown"].includes(c.category)).map(c => `profile.v1.component.${c.category}`);
+    expectedQuestions.push("profile.v1.generic.independent_inspection", "profile.v1.generic.service_records");
+    if (data.inspection_questions.length !== expectedQuestions.length || data.inspection_questions.some((q, i) => q.question_id !== expectedQuestions[i])) return false;
     const sources = data.source_coverage;
     if (!object(sources)) return false;
     for (const key of ["complaints", "recalls", "manufacturer_communications", "validated_symptoms"]) {
