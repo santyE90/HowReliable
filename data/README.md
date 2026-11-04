@@ -16,9 +16,10 @@ data/
 Never edit or overwrite a raw artifact. Retrieve a newly published artifact under its
 official filename and use its SHA-256 checksum and provenance sidecar to distinguish it.
 
-The installed browser demo requires the generated index plus the separately restored
-canonical model bundle under ignored `artifacts/` and its registered data paths. Neither
-is delivered by a clean Git clone. See [reproducibility](../docs/reproducibility.md) and
+The installed browser demo requires the generated historical index and its provenance sidecar.
+The separately restored canonical model bundle and P7 official-evidence SQLite/manifest pair
+are optional panels. These ignored artifacts are not delivered by a clean Git clone.
+See the [v1.0 inventory and backup guide](../docs/release-v1.md), [reproducibility](../docs/reproducibility.md) and
 [local demo setup](../docs/local-demo.md). Do not commit datasets, indexes, models, or private
 annotation materials. Source terms and artifact distribution remain separate owner decisions.
 

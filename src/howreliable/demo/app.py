@@ -16,6 +16,7 @@ from howreliable.api.service import PredictionService
 from howreliable.config.settings import Settings
 from howreliable.data.ingestion.nhtsa_complaints import sha256_file
 from howreliable.demo.index import DEFAULT_INDEX, HistoricalIndex
+from howreliable.demo.official_evidence import DEFAULT_OFFICIAL, optional_official
 from howreliable.demo.pricing import compare_prices
 from howreliable.demo.pricing_schemas import PricingRequest, PricingResult
 from howreliable.demo.problem_profile import ProblemProfileService
@@ -40,7 +41,7 @@ G1_SUMMARY = Path("artifacts/nlp/owner-reports/g1-smoke-20261027-seed-8a01/summa
 
 def create_app(
     *, root: Path | None = None, index_path: Path | None = None,
-    service: PredictionService | None = None,
+    service: PredictionService | None = None, official_path: Path | None = None,
 ) -> FastAPI:
     """Local backend only: never select the optional S3 artifact backend."""
     root = root or Path.cwd()
@@ -51,7 +52,9 @@ def create_app(
     )
     predictions: PredictionService | None = app.state.prediction_service
     purchase_service = PurchaseAssessmentService(index)
-    profile_service = ProblemProfileService(index)
+    profile_service = ProblemProfileService(
+        index, optional_official(official_path or root / DEFAULT_OFFICIAL),
+    )
 
     @app.post(
         "/api/demo/v1/vehicle-problem-profiles", response_model=VehicleProblemProfile,

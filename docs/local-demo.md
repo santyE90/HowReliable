@@ -1,4 +1,10 @@
-# Local browser demo (Milestones H2–H3)
+# Local browser demo — v1.0
+
+**Release checkpoint (2026-11-04):** planned P4–P7 feature development and final cleanup are
+complete. The provisioned full suite passes 956 tests with one optional research-artifact
+skip. See [v1.0 release, exact artifact inventory and backup/restore procedure](release-v1.md).
+Official evidence is optional and verified; the frozen model and global NLP are also optional.
+The earlier milestone notes below preserve project history, not new development commitments.
 
 **Current direction:** P1/P2 provide the [purchase-assessment workflow](purchase-assessment.md),
 using historical evidence and deterministic inspection prompts. H4 screenshots/recordings
@@ -50,9 +56,9 @@ are not independently verified; broader device/screen-reader certification is no
 
 ## Where We Left Off — H3.1 checkpoint (2026-11-02)
 
-This preserves the H3.1 handoff; development has resumed for H4 portfolio readiness.
-H4A audited the repository and H4B updates presentation/reproducibility documentation;
-H4C will capture actual screenshots and a walkthrough. See [reproducibility](reproducibility.md)
+This preserves the historical H3.1 handoff. H4A audited the repository and H4B updated
+presentation/reproducibility documentation. Screenshots and recordings remain deferred;
+there is no further planned feature phase. See [reproducibility](reproducibility.md)
 for the clean-clone, historical-index, and full-demo setup levels, and
 [licensing status](licensing.md) for the pending owner decision.
 H1 audited readiness, H2 built the historical
@@ -351,8 +357,8 @@ profile. Missing/corrupt mandatory indexes still prevent startup.
 
 These US NHTSA reports are allegations, not verified failures or failure rates. Component
 categories overlap. Exact cohort matching does not establish trim, VIN or Canadian-market
-applicability. Recall/TSB evidence is unavailable locally, and validated NLP symptom evidence
-remains unavailable; null is not zero. Questions are inspection prompts, not diagnoses.
+applicability. Recall/TSB availability depends on the separately verified P7 artifact; validated
+NLP symptom evidence remains unavailable. Null is not zero. Questions are prompts, not diagnoses.
 This endpoint does not change purchase-readiness or asking-price comparison policy.
 See [the profile contract and evidence policy](vehicle-problem-profile.md) for details.
 
@@ -365,15 +371,44 @@ charts, the frozen historical ML experiment and the global experimental NLP samp
 separate. Refresh requires a complete policy question set; truncated responses display no
 profile evidence.
 
-Recall/TSB and validated NLP evidence are not integrated. P6E found no corresponding verified
+At the P6F checkpoint, recall/TSB and validated NLP evidence were not integrated. P6E found no
+corresponding verified
 source artifacts in the inspected locations. Official-source recovery and integration are
 deferred to **proposed P7**, subject to source/provenance verification and approval of a
 separate offline artifact plus API/client extensions. No recovery happens at startup or in
 HTTP requests. EWR remains outside the shopper-facing profile.
 
-The complete repository test run is not green on this laptop: legacy deployment/S3 contract
+At the P6F checkpoint the complete repository test run was not green: legacy deployment/S3 contract
 fixtures and representative local explanations are missing, and one independent neural
 metric equality test differs by approximately 5.7e-11. A full-corpus PyTorch artifact test
 also skips absent inputs. These are separate from the passing local P6/P4/P5 workflow checks;
 see the profile document for exact paths and follow-up scope. Spoken screen-reader review
 was not performed; browser keyboard/focus and accessibility-tree checks are not certification.
+
+### P7 final feature checkpoint: optional official evidence
+
+P7 now supplies verified NHTSA recall and manufacturer-communication snapshots through the
+same Vehicle Problem Profile button. Startup loads the optional checksummed artifact at
+`data/processed/official/p7-20261104-v1/` when available. Missing/corrupt official evidence
+preserves complaint-only operation; no downloads or builds happen at startup or in requests.
+The model remains optional. Local startup is unchanged:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn howreliable.demo.app:create_app --factory --host 127.0.0.1 --port 8000
+```
+
+Expand **NHTSA recalls** and **Manufacturer communications / TSBs** separately to see source
+identity, descriptions, consequences/remedies or communication type/summary, dates and
+provenance. Each source shows its exact unique count and at most ten stable-ID-ordered
+records, with an explicit preview limit. The communication snapshot covers NHTSA receipt
+years 2020-2024 only. Scoped zero matches do not mean no recalls/bulletins/problems.
+U.S. broad cohort matching does not verify Canadian-market, trim or individual VIN
+applicability, current open recalls, condition or remedy completion. P4/P5 rules and the
+frozen ML/global NLP panels remain separate. Validated NLP and EWR evidence are not added.
+
+Source-enabled responses use profile 1.1; complaint-only fallback remains 1.0. See
+[official evidence artifacts and validation](official-evidence.md) for paths, build commands,
+resource measurements and current source counts. Back up the ignored artifacts for another
+laptop; no more feature-development milestones are planned. Final v1.0 cleanup resolved the
+legacy fixture/numerical issues above: the provisioned full suite now passes 956 tests with
+one optional research-artifact skip. See the [release record](release-v1.md).

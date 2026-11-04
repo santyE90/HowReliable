@@ -1,9 +1,22 @@
 # P6B: vehicle problem profile contract and evidence policy
 
-Status: **P6F validated for the local structured-complaint demo; repository-wide test
-failures remain documented below**.
-Request/response contract: `vehicle-problem-profile-1.0`.
+Status: **P7 optional verified recall/communication integration implemented**. The P6
+checkpoint below remains the historical complaint-only release record.
+Request contract: `vehicle-problem-profile-1.0`. Response: 1.0 complaint-only fallback or
+`vehicle-problem-profile-1.1` when verified official evidence is available.
 Evidence/question policy: `howreliable-problem-evidence-policy-1.0`.
+
+P7 acquires a new verified NHTSA snapshot and serves it from a separate optional offline
+SQLite artifact. It does not recover the missing historical files, rewrite complaints or
+change purchase/pricing/model rules. See [official evidence scope, contract, artifact paths
+and validation](official-evidence.md) for the current implementation. The dashboard adds
+separate recall and manufacturer-communication expanders, at most ten records per source,
+with exact unique counts and explicit preview limits. Unknown source availability stays null;
+verified zero matches apply only to that snapshot. NLP and EWR are not published.
+
+Final local v1.0 cleanup resolves the historical fixture/numerical test issues recorded
+below. Current validation: 956 passed, one optional research-artifact skip. See the
+[release and artifact-preservation guide](release-v1.md) for restoration provenance and limits.
 
 P6A found that a useful initial profile can use the existing validated historical index.
 It also found that processed recall, manufacturer-communication and EWR serving artifacts

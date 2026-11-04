@@ -1,9 +1,16 @@
 # Reproducibility and local artifacts
 
-There are three distinct setup levels. Git contains application code, tests, documentation,
+Runtime provisioning and research reproducibility are distinct. Git contains code, tests, documentation,
 and infrastructure templates, not the data or canonical model bundle. No public download
 location for the exact frozen bundle is currently provided. An owner-approved distribution
 or restoration process remains unresolved; do not substitute an invented URL or a retrained model.
+
+For the finished local v1.0 demo, use the [release inventory and backup/restore guide](release-v1.md).
+Only the historical index and its sidecar are mandatory. Official evidence needs its separate
+optional SQLite/manifest pair; the frozen ML bundle and global NLP summary are optional.
+Source corpora are needed to reproduce processing, not to launch a restored demo. The final
+local run passes 956 tests with one optional research-artifact skip. See the guide for the
+three legitimately restored test fixtures and the narrowly justified neural test tolerance.
 
 ## A. Clean clone: inspect, install, and test code
 

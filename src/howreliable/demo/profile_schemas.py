@@ -113,10 +113,43 @@ class SourceCoverage(APIModel):
     records: None = None
 
 
+class OfficialRecord(APIModel):
+    kind: Literal["recall", "communication"]
+    record_id: str = Field(min_length=1)
+    source_identifier: str = Field(min_length=1)
+    manufacturer_identifiers: list[str]
+    title: str = Field(min_length=1)
+    descriptions: list[str]
+    consequences: list[str]
+    remedies: list[str]
+    communication_type: str | None
+    original_communication_type: str | None
+    components: list[Component]
+    dates: dict[str, list[str]]
+    quality_flags: list[str]
+    source_artifacts: list[str]
+    matching_applicability_rows: int = Field(ge=1)
+    applicability_note: str
+
+
+class OfficialSourceCoverage(APIModel):
+    availability: Literal["AVAILABLE"] = "AVAILABLE"
+    reason_code: Literal["verified_offline_snapshot"] = "verified_offline_snapshot"
+    explanation: str
+    applicability_status: Literal["EXACT_BROAD_COHORT_ONLY"] = "EXACT_BROAD_COHORT_ONLY"
+    snapshot_date: str
+    snapshot_scope: str
+    provenance: dict[str, str]
+    unique_record_count: int = Field(ge=0)
+    returned_record_count: int = Field(ge=0, le=10)
+    records_truncated: bool
+    records: list[OfficialRecord]
+
+
 class ProfileSources(APIModel):
     complaints: SourceCoverage
-    recalls: SourceCoverage
-    manufacturer_communications: SourceCoverage
+    recalls: SourceCoverage | OfficialSourceCoverage
+    manufacturer_communications: SourceCoverage | OfficialSourceCoverage
     validated_symptoms: SourceCoverage
 
 
@@ -126,7 +159,9 @@ class EvidenceGap(APIModel):
 
 
 class VehicleProblemProfile(APIModel):
-    schema_version: Literal["vehicle-problem-profile-1.0"] = "vehicle-problem-profile-1.0"
+    schema_version: Literal["vehicle-problem-profile-1.0", "vehicle-problem-profile-1.1"] = (
+        "vehicle-problem-profile-1.0"
+    )
     policy_version: Literal["howreliable-problem-evidence-policy-1.0"] = (
         "howreliable-problem-evidence-policy-1.0"
     )

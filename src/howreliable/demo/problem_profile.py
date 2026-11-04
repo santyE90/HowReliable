@@ -4,6 +4,7 @@ import sqlite3
 from typing import Literal
 
 from howreliable.demo.index import HistoricalIndex
+from howreliable.demo.official_evidence import OfficialEvidence
 from howreliable.demo.profile_schemas import (
     ComponentEvidenceAnnotation,
     EvidenceGap,
@@ -312,8 +313,9 @@ def build_problem_profile(
 
 
 class ProblemProfileService:
-    def __init__(self, index: HistoricalIndex):
+    def __init__(self, index: HistoricalIndex, official: OfficialEvidence | None = None):
         self.index = index
+        self.official = official
 
     def profile(self, request: ProfileRequest) -> VehicleProblemProfile:
         try:
@@ -326,6 +328,28 @@ class ProblemProfileService:
                 if len(candidates) == 1
                 else None
             )
-            return build_problem_profile(request, candidates, history)
+            result = build_problem_profile(request, candidates, history)
         except (OSError, sqlite3.Error, ValueError, KeyError):
             return build_problem_profile(request, [], None, source_available=False)
+        if result.profile_status != "AVAILABLE" or self.official is None:
+            return result
+        updates = {}
+        for source in ("recalls", "manufacturer_communications"):
+            try:
+                coverage = self.official.lookup(source, result.requested_identity)
+            except (OSError, sqlite3.Error, ValueError, KeyError, TypeError):
+                coverage = None
+            if coverage is not None:
+                updates[source] = coverage
+        if not updates:
+            return result
+        gaps = [g for g in result.missing_information if g.code != "official_sources_unavailable"]
+        if len(updates) < 2:
+            gaps.append(EvidenceGap(code="official_sources_unavailable", explanation=(
+                "Some official evidence remains unavailable; see source coverage."
+            )))
+        return result.model_copy(update={
+            "schema_version": "vehicle-problem-profile-1.1",
+            "source_coverage": result.source_coverage.model_copy(update=updates),
+            "missing_information": gaps,
+        })

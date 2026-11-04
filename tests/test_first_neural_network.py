@@ -165,6 +165,13 @@ def test_early_stopping_restoration_and_deterministic_training() -> None:
     for name, value in evaluation.metrics.items():
         if name == "loss":
             assert value == pytest.approx(first.final_validation.metrics[name], abs=1e-7)
+        elif name == "brier_score":
+            # Evaluation uses batch 8 here versus 64 in train_candidate. Float32
+            # GEMM rounding changes logits by ~3e-8 and Brier by ~5.7e-11 on CPU.
+            # Keep deterministic histories/weights and discrete metrics exact.
+            assert value == pytest.approx(
+                first.final_validation.metrics[name], abs=1e-10, rel=0,
+            )
         else:
             assert value == first.final_validation.metrics[name]
 

@@ -33,8 +33,14 @@
     panel.setAttribute("aria-busy", "false"); button.disabled = !selection();
     announce(selection() ? "Selection changed. Load the profile for this vehicle." : "Choose make, model and year to load a profile.");
   }
+  function validOfficial(s, source) {
+    if (!object(s) || s.availability !== "AVAILABLE" || s.reason_code !== "verified_offline_snapshot" || s.applicability_status !== "EXACT_BROAD_COHORT_ONLY" || !string(s.snapshot_scope) || !string(s.snapshot_date) || !object(s.provenance) || !Object.values(s.provenance).every(string) || !/^[a-f0-9]{64}$/.test(s.provenance.serving_database_sha256) || s.provenance.serving_schema_version !== "howreliable-official-evidence-1.0" || s.provenance.matching_policy_version !== "official-exact-nfkc-whitespace-casefold-1.0" || !count(s.unique_record_count) || !count(s.returned_record_count) || !Array.isArray(s.records) || s.records.length > 10 || s.returned_record_count !== s.records.length || s.unique_record_count < s.records.length || s.records_truncated !== (s.unique_record_count > s.records.length) || new Set(s.records.map(r => r?.record_id)).size !== s.records.length) return false;
+    const kind = source === "recalls" ? "recall" : "communication";
+    if (!s.records.length && s.unique_record_count > 0) return false;
+    return s.records.every(r => object(r) && r.kind === kind && string(r.record_id) && string(r.source_identifier) && string(r.title) && strings(r.manufacturer_identifiers) && strings(r.descriptions) && strings(r.consequences) && strings(r.remedies) && Array.isArray(r.components) && r.components.every(c => codes.has(c)) && object(r.dates) && Object.values(r.dates).every(v => Array.isArray(v) && v.every(d => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(d)) && new Date(d).toISOString().slice(0, 10) === d)) && strings(r.quality_flags) && strings(r.source_artifacts) && count(r.matching_applicability_rows) && r.matching_applicability_rows > 0 && string(r.applicability_note) && (kind === "recall" ? r.communication_type === null && r.original_communication_type === null : string(r.communication_type) && string(r.original_communication_type)));
+  }
   function valid(data, request, status) {
-    if (!object(data) || data.schema_version !== "vehicle-problem-profile-1.0" || data.policy_version !== "howreliable-problem-evidence-policy-1.0" || !same(data.requested_identity, request) || data.supplied_configuration !== null) return false;
+    if (!object(data) || !["vehicle-problem-profile-1.0", "vehicle-problem-profile-1.1"].includes(data.schema_version) || data.policy_version !== "howreliable-problem-evidence-policy-1.0" || !same(data.requested_identity, request) || data.supplied_configuration !== null) return false;
     const statuses = {AVAILABLE: [200, "EXACT_COHORT_MATCH"], NO_MATCHING_REPORTS: [200, "NO_MATCHING_REPORTS"], AMBIGUOUS_IDENTITY: [409, "AMBIGUOUS_IDENTITY"], SOURCE_UNAVAILABLE: [503, "SOURCE_UNAVAILABLE"]};
     const expected = statuses[data.profile_status], resolution = data.identity_resolution, applicability = data.applicability;
     if (!expected || expected[0] !== status || !object(resolution) || resolution.status !== expected[1] || !Array.isArray(resolution.candidates) || !resolution.candidates.every(c => vehicle(c) && same(c, request)) || new Set(resolution.candidates.map(c => c.id)).size !== resolution.candidates.length) return false;
@@ -70,18 +76,43 @@
     if (!object(sources)) return false;
     for (const key of ["complaints", "recalls", "manufacturer_communications", "validated_symptoms"]) {
       const s = sources[key];
+      if (["recalls", "manufacturer_communications"].includes(key) && s?.availability === "AVAILABLE") {
+        if (data.schema_version !== "vehicle-problem-profile-1.1" || !available || !validOfficial(s, key)) return false;
+        continue;
+      }
       if (!object(s) || !string(s.reason_code) || !string(s.explanation) || !string(s.applicability_status) || s.records !== null || !(s.snapshot_date === null || string(s.snapshot_date)) || !(s.provenance_reference === null || string(s.provenance_reference))) return false;
       if (key === "complaints") {
         if (s.availability !== (data.profile_status === "SOURCE_UNAVAILABLE" ? "SOURCE_UNAVAILABLE" : "AVAILABLE") || s.applicability_status !== resolution.status || s.unique_record_count !== (available ? h.unique_report_count : null) || s.provenance_reference !== (available ? "historical_evidence.provenance" : null)) return false;
       } else if (s.availability !== (key === "validated_symptoms" ? "VALIDATED_EVIDENCE_UNAVAILABLE" : "SOURCE_UNAVAILABLE") || s.unique_record_count !== null) return false;
     }
-    return true;
+    return data.schema_version !== "vehicle-problem-profile-1.1" || [sources.recalls, sources.manufacturer_communications].some(s => s.availability === "AVAILABLE");
   }
   function list(parent, values) {
     const ul = node("ul"); values.forEach(value => ul.append(node("li", value))); parent.append(ul);
   }
   function details(parent, title, value) {
     const d = node("details"); d.append(node("summary", title), node("pre", JSON.stringify(value, null, 2))); parent.append(d);
+  }
+  function officialEntries(parent, source, label) {
+    if (source.availability !== "AVAILABLE") return;
+    const section = node("details", undefined, "official-evidence");
+    const units = label === "NHTSA recalls" ? "campaigns" : "documents";
+    section.append(node("summary", `${label} — ${number(source.unique_record_count)} unique ${units} in this snapshot`), node("p", source.snapshot_scope, "muted"), node("p", "U.S. regulatory/documentary records, not failure-frequency measurements. Broad cohort applicability only; verify the individual vehicle independently.", "notice"));
+    if (!source.records.length) section.append(node("p", "No exact matching records in this verified snapshot. This is not proof of no recalls, bulletins or problems."));
+    if (source.records_truncated) section.append(node("p", `Showing the first ${source.returned_record_count} of ${source.unique_record_count} unique ${units}, ordered by stable NHTSA identity. Additional records remain in the local artifact; this view is not exhaustive.`, "notice"));
+    for (const r of source.records) {
+      const entry = node("details"); entry.append(node("summary", r.title));
+      entry.append(node("p", `NHTSA identity: ${r.source_identifier}. Manufacturer reference: ${r.manufacturer_identifiers.join(", ") || "Not supplied"}.`));
+      if (r.original_communication_type) entry.append(node("p", `Source communication type: ${r.original_communication_type}.`));
+      for (const [title, values] of [["Source description / summary", r.descriptions], ["Consequence", r.consequences], ["Remedy", r.remedies]]) {
+        if (r.kind === "communication" && title !== "Source description / summary") continue;
+        entry.append(node("h5", title));
+        if (values.length) list(entry, values); else entry.append(node("p", "Not supplied in this snapshot.", "muted"));
+      }
+      entry.append(node("p", `Campaign/document-wide components: ${r.components.map(c => c.replaceAll("_", " ")).join(", ") || "Not supplied"}. These labels are not specific failure findings for this vehicle.`, "muted"), node("p", r.applicability_note, "muted"));
+      details(entry, "Source dates, applicability and traceability", {dates: r.dates, source_artifacts: r.source_artifacts, matching_applicability_rows: r.matching_applicability_rows, quality_flags: r.quality_flags, record_id: r.record_id}); section.append(entry);
+    }
+    details(section, "Verified source provenance", source.provenance); parent.append(section);
   }
   function render(data) {
     // Assemble off-DOM; a failed render cannot publish partial evidence.
@@ -122,9 +153,12 @@
     const labels = {complaints: "U.S. NHTSA complaints", recalls: "NHTSA recall evidence", manufacturer_communications: "Manufacturer communications / TSBs", validated_symptoms: "Validated NLP symptom evidence"};
     const availability = {AVAILABLE: "Source available", SOURCE_UNAVAILABLE: "Unavailable locally — not zero", VALIDATED_EVIDENCE_UNAVAILABLE: "Unavailable — human validation deferred"};
     list(body, Object.entries(labels).map(([key, label]) => `${label}: ${availability[data.source_coverage[key].availability]}.`));
+    officialEntries(body, data.source_coverage.recalls, "NHTSA recalls");
+    officialEntries(body, data.source_coverage.manufacturer_communications, "Manufacturer communications / TSBs");
     body.append(node("p", "Exact make/model/year matching does not establish trim or powertrain applicability. Individual VIN and Canadian-market applicability are unverified; no open-recall or remedy-completion check is performed.", "notice"));
     details(body, "Missing evidence and applicability caveats", {applicability: data.applicability, missing_information: data.missing_information});
-    details(body, "Index version, source coverage and provenance", {schema_version: data.schema_version, policy_version: data.policy_version, historical_provenance: h?.provenance || null, source_coverage: data.source_coverage, identity_resolution: data.identity_resolution});
+    const coverageMetadata = Object.fromEntries(Object.entries(data.source_coverage).map(([key, value]) => [key, Object.fromEntries(Object.entries(value).filter(([field]) => field !== "records"))]));
+    details(body, "Index version, source coverage and provenance", {schema_version: data.schema_version, policy_version: data.policy_version, historical_provenance: h?.provenance || null, source_coverage: coverageMetadata, identity_resolution: data.identity_resolution});
     details(body, "Full evidence limitations", data.limitations);
     output.replaceChildren(body); output.hidden = false; title.focus();
   }
@@ -140,7 +174,7 @@
       if (current !== version || !same(request, selection())) return;
       if (![200, 409, 503].includes(response.status)) throw new Error(`Profile request failed (HTTP ${response.status}). Check the local server and selection, then retry.`);
       const raw = await response.text();
-      if (raw.length > 1000000) throw new Error("Profile response is too large. No evidence was displayed.");
+      if (raw.length > 4000000) throw new Error("Profile response is too large. No evidence was displayed.");
       const data = JSON.parse(raw);
       if (current !== version || !same(request, selection())) return;
       if (!valid(data, request, response.status)) throw new Error("Profile response is incomplete or does not match this selection. No evidence was displayed.");
